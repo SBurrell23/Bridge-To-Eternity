@@ -75,8 +75,9 @@ function ensureModal() {
   });
 }
 
-export function openModal({ title, body, actions = [], dismissable = true, onClose = null }) {
+export function openModal({ title, body, actions = [], dismissable = true, onClose = null, wide = false }) {
   ensureModal();
+  modal.root.querySelector('.modal').classList.toggle('wide', !!wide);
   modal.dismissable = dismissable;
   modal.onClose = onClose;
   $('#modal-title').textContent = title || '';

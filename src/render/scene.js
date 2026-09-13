@@ -243,9 +243,15 @@ export class World {
     this.scene.fog.far = quality.fogFar || 260;
   }
 
-  update(dt) {
+  update(dt, camera) {
     this.time += dt;
     const t = this.time;
+
+    // The sky sphere follows the camera. That keeps the viewer at its centre,
+    // so the horizon always lands on the band of the gradient that is painted
+    // in the exact fog colour -- the far edge of the cloud floor dissolves into
+    // it and there is no line to see, however far the camera roams.
+    if (camera) this.sky.position.copy(camera.position);
 
     // The cloud sheets slide forever; the board never reaches an edge.
     this.floorTex.offset.x = (t * 0.0035) % 1;

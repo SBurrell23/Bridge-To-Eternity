@@ -172,7 +172,7 @@ function loop(now) {
 
 /** Advance and draw exactly one frame. Split out so it can be driven by hand. */
 function frame(dt) {
-  app.world.update(dt);
+  app.world.update(dt, app.cam.camera);
   app.board.update(dt);
   app.hand.update(dt);
   app.cam.update(dt);

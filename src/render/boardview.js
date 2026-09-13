@@ -181,7 +181,18 @@ export class BoardView {
     arch.rotation.y = Math.PI / 2;
     g.add(arch);
 
-    // The portal between the pillars.
+    // The portal fills the opening exactly: straight sides up to the springing
+    // line, then the same semicircle as the arch above it. A plain rectangle
+    // poked out past the arch at both top corners.
+    const half = 0.66;
+    const spring = 2.16;
+    const shape = new THREE.Shape();
+    shape.moveTo(-half, 0);
+    shape.lineTo(-half, spring);
+    shape.absarc(0, spring, half, Math.PI, 0, true);
+    shape.lineTo(half, 0);
+    shape.closePath();
+
     const portalMat = new THREE.MeshBasicMaterial({
       color: tile.revealed ? (tile.isGold ? 0xfff2c4 : 0x5a6474) : 0x2b2445,
       transparent: true,
@@ -189,15 +200,15 @@ export class BoardView {
       side: THREE.DoubleSide,
       depthWrite: false,
     });
-    const portal = new THREE.Mesh(new THREE.PlaneGeometry(1.56, 2.9), portalMat);
-    portal.position.set(0, 1.45, 0);
+    const portal = new THREE.Mesh(new THREE.ShapeGeometry(shape, 24), portalMat);
+    portal.position.set(0, SLAB_H / 2, 0);
     portal.rotation.y = Math.PI / 2;
     g.add(portal);
     g.userData.portal = portal;
 
     if (tile.revealed && tile.isGold) {
-      const glow = glowSprite('255,238,180', 12, 0.8);
-      glow.position.set(0, 1.6, 0);
+      const glow = glowSprite('255,238,180', 10, 0.7);
+      glow.position.set(0, 1.5, 0);
       g.add(glow);
       const beam = new THREE.Mesh(
         new THREE.CylinderGeometry(0.9, 1.6, 60, 16, 1, true),
@@ -209,8 +220,8 @@ export class BoardView {
       beam.position.set(0, 30, 0);
       g.add(beam);
     } else if (!tile.revealed) {
-      const glow = glowSprite('150,130,220', 7, 0.5);
-      glow.position.set(0, 1.5, 0);
+      const glow = glowSprite('150,130,220', 5.5, 0.38);
+      glow.position.set(0, 1.35, 0);
       g.add(glow);
     }
     return g;
@@ -307,17 +318,17 @@ export class BoardView {
       g.add(ring);
 
       const column = new THREE.Mesh(
-        new THREE.CylinderGeometry(TILE * 0.34, TILE * 0.34, 3.4, 16, 1, true),
+        new THREE.CylinderGeometry(TILE * 0.28, TILE * 0.36, 1.5, 16, 1, true),
         new THREE.MeshBasicMaterial({
-          color, transparent: true, opacity: 0.1, side: THREE.DoubleSide,
+          color, transparent: true, opacity: 0.05, side: THREE.DoubleSide,
           blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
         }),
       );
-      column.position.y = 1.8;
+      column.position.y = 0.85;
       g.add(column);
 
-      const spark = glowSprite(rgb, 2.6, 0.28);
-      spark.position.y = 0.45;
+      const spark = glowSprite(rgb, 1.9, 0.16);
+      spark.position.y = 0.3;
       g.add(spark);
 
       g.position.copy(cellToWorld(c.x, c.y));
@@ -450,8 +461,8 @@ export class BoardView {
 
     const pulse = 0.6 + 0.4 * Math.sin(t * 3.2);
     for (const m of this.markers.children) {
-      m.children[0].material.opacity = 0.5 + 0.45 * pulse;
-      m.children[1].material.opacity = 0.05 + 0.08 * pulse;
+      m.children[0].material.opacity = 0.55 + 0.4 * pulse;
+      m.children[1].material.opacity = 0.025 + 0.04 * pulse;
       m.rotation.y = t * 0.5;
     }
 

@@ -700,6 +700,205 @@ export function drawEye(ctx, cx, cy, R) {
   ctx.restore();
 }
 
+function cubicAt(p0, p1, p2, p3, t) {
+  const u = 1 - t;
+  return u * u * u * p0 + 3 * u * u * t * p1 + 3 * u * t * t * p2 + t * t * t * p3;
+}
+
+/**
+ * A solid horn, built by sweeping a shrinking disc along a curve. Outlining one
+ * as a closed bezier kept pinching into a sliver; a swept taper cannot.
+ */
+function sweptHorn(ctx, pts, baseR, fill) {
+  ctx.beginPath();
+  for (let i = 0; i < pts.length; i++) {
+    const t = i / (pts.length - 1);
+    const r = baseR * Math.pow(1 - t, 1.25) + baseR * 0.03;
+    ctx.moveTo(pts[i].x + r, pts[i].y);
+    ctx.arc(pts[i].x, pts[i].y, r, 0, Math.PI * 2);
+  }
+  ctx.fillStyle = fill;
+  ctx.fill();
+}
+
+export function drawHornsAndFire(ctx, cx, cy, R) {
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  // --- fire: nested silhouettes, so it reads as one mass of flame ---------
+  // Separate tongues looked like petals; layering one wavy outline inside
+  // another gives a blaze with a hot core. The layers are composed off-screen
+  // so the flat bottom of each path can be dissolved away without punching a
+  // hole through the card beneath.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const bloom = ctx.createRadialGradient(0, R * 0.5, 0, 0, R * 0.5, R * 2.6);
+  bloom.addColorStop(0, 'rgba(255,150,60,0.5)');
+  bloom.addColorStop(0.4, 'rgba(196,42,24,0.28)');
+  bloom.addColorStop(1, 'rgba(100,6,16,0)');
+  ctx.fillStyle = bloom;
+  ctx.fillRect(-R * 3, -R * 3, R * 6, R * 6);
+  ctx.restore();
+
+  const FW = Math.ceil(R * 8);
+  const FH = Math.ceil(R * 5);
+  const fire = createCanvas(FW, FH);
+  const fx = fire.getContext('2d');
+  fx.translate(FW / 2, FH * 0.72);
+
+  const base = R * 1.0;
+  const flameLayer = (peaks, colour) => {
+    fx.fillStyle = colour;
+    fx.beginPath();
+    fx.moveTo(peaks[0][0] * R, base);
+    let prev = peaks[0][0] * R;
+    for (const [px, ph] of peaks) {
+      const x = px * R;
+      const y = -ph * R;
+      fx.quadraticCurveTo((prev + x) / 2, base * 0.3, x - R * 0.07, y + R * 0.05);
+      fx.quadraticCurveTo(x, y - R * 0.14, x + R * 0.07, y + R * 0.05);
+      prev = x;
+    }
+    fx.lineTo(peaks[peaks.length - 1][0] * R, base);
+    fx.closePath();
+    fx.fill();
+  };
+
+  flameLayer([[-1.58, 0.04], [-1.22, 0.34], [-0.86, 0.76], [-0.4, 0.46],
+    [0.06, 0.94], [0.5, 0.52], [0.98, 0.78], [1.32, 0.3], [1.6, 0.04]], '#8e1420');
+  flameLayer([[-1.16, 0.04], [-0.84, 0.4], [-0.46, 0.8], [-0.02, 0.54],
+    [0.4, 0.88], [0.84, 0.44], [1.14, 0.04]], '#c22f28');
+  flameLayer([[-0.8, 0.04], [-0.5, 0.44], [-0.14, 0.76], [0.24, 0.5],
+    [0.6, 0.68], [0.84, 0.04]], '#ef6a24');
+  flameLayer([[-0.5, 0.04], [-0.26, 0.42], [0.04, 0.64], [0.34, 0.36],
+    [0.54, 0.04]], '#ffb047');
+  flameLayer([[-0.24, 0.04], [-0.06, 0.34], [0.14, 0.46], [0.28, 0.04]], '#ffe6ae');
+
+  // Dissolve the straight base into the coals.
+  fx.globalCompositeOperation = 'destination-out';
+  const fade = fx.createLinearGradient(0, base - R * 0.62, 0, base + R * 0.04);
+  fade.addColorStop(0, 'rgba(0,0,0,0)');
+  fade.addColorStop(1, 'rgba(0,0,0,1)');
+  fx.fillStyle = fade;
+  fx.fillRect(-FW / 2, base - R * 0.62, FW, R * 0.7);
+
+  ctx.drawImage(fire, -FW / 2, -FH * 0.72);
+
+  // The bed of coals the flames stand in.
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const bed = ctx.createRadialGradient(0, R * 0.72, 0, 0, R * 0.72, R * 1.7);
+  bed.addColorStop(0, 'rgba(255,196,96,0.75)');
+  bed.addColorStop(0.34, 'rgba(226,78,34,0.5)');
+  bed.addColorStop(1, 'rgba(140,16,24,0)');
+  ctx.save();
+  ctx.scale(1, 0.42);
+  ctx.fillStyle = bed;
+  ctx.beginPath();
+  ctx.arc(0, R * 1.72, R * 1.7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  for (let i = 0; i < 26; i++) {
+    const x = (Math.random() - 0.5) * R * 3.4;
+    const y = R * 0.6 - Math.random() * R * 2.5;
+    const r = R * (0.01 + Math.random() * 0.032);
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, 'rgba(255,218,140,0.95)');
+    g.addColorStop(1, 'rgba(255,110,40,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // --- horns: long, heavy, sweeping out of the blaze ----------------------
+  const horn = (dir) => {
+    ctx.save();
+    ctx.scale(dir, 1);
+
+    // Centreline: out of the fire, outward, then up and slightly back.
+    const P = [
+      { x: R * 0.30, y: R * 1.0 },
+      { x: R * 0.62, y: R * 0.2 },
+      { x: R * 1.34, y: -R * 0.5 },
+      { x: R * 1.32, y: -R * 1.72 },
+    ];
+    const pts = [];
+    for (let i = 0; i <= 44; i++) {
+      const t = i / 44;
+      pts.push({
+        x: cubicAt(P[0].x, P[1].x, P[2].x, P[3].x, t),
+        y: cubicAt(P[0].y, P[1].y, P[2].y, P[3].y, t),
+      });
+    }
+
+    ctx.save();
+    ctx.shadowColor = 'rgba(30,2,8,0.95)';
+    ctx.shadowBlur = R * 0.34;
+    sweptHorn(ctx, pts, R * 0.34, '#180709');
+    ctx.restore();
+
+    // Warm rim down the lit side, and cool sheen along the back.
+    ctx.save();
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i++) {
+      const t = i / (pts.length - 1);
+      const r = R * 0.34 * Math.pow(1 - t, 1.25) + R * 0.01;
+      ctx.moveTo(pts[i].x + r, pts[i].y);
+      ctx.arc(pts[i].x, pts[i].y, r, 0, Math.PI * 2);
+    }
+    ctx.clip();
+
+    ctx.strokeStyle = 'rgba(255,140,62,0.9)';
+    ctx.lineWidth = R * 0.075;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    pts.forEach((pt, i) => {
+      const t = i / (pts.length - 1);
+      const off = R * 0.22 * (1 - t);
+      const p = { x: pt.x - off, y: pt.y + off * 0.35 };
+      if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(255,190,140,0.22)';
+    ctx.lineWidth = R * 0.05;
+    ctx.beginPath();
+    pts.forEach((pt, i) => {
+      const t = i / (pts.length - 1);
+      const off = R * 0.2 * (1 - t);
+      const p = { x: pt.x + off, y: pt.y - off * 0.3 };
+      if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+    });
+    ctx.stroke();
+
+    // Growth ridges around the horn.
+    ctx.strokeStyle = 'rgba(255,160,100,0.3)';
+    ctx.lineWidth = R * 0.035;
+    for (let i = 4; i < pts.length - 6; i += 5) {
+      const t = i / (pts.length - 1);
+      const r = R * 0.36 * Math.pow(1 - t, 1.25);
+      const dx = pts[i + 1].x - pts[i - 1].x;
+      const dy = pts[i + 1].y - pts[i - 1].y;
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len;
+      const ny = dx / len;
+      ctx.beginPath();
+      ctx.moveTo(pts[i].x - nx * r, pts[i].y - ny * r);
+      ctx.lineTo(pts[i].x + nx * r, pts[i].y + ny * r);
+      ctx.stroke();
+    }
+    ctx.restore();
+    ctx.restore();
+  };
+  horn(1);
+  horn(-1);
+
+  ctx.restore();
+}
+
 // ---------------------------------------------------------------------------
 // Hand cards.
 // ---------------------------------------------------------------------------
@@ -789,14 +988,14 @@ function cardBanner(ctx, W, title, y, ink) {
   ctx.lineWidth = W * 0.006;
   ctx.stroke();
 
-  let size = Math.round(W * 0.082);
+  let size = Math.round(W * 0.092);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = ink;
   do {
     ctx.font = '700 ' + size + 'px Cinzel, Georgia, serif';
     size -= 2;
-  } while (ctx.measureText(title).width > W * 0.74 && size > 18);
+  } while (ctx.measureText(title).width > W * 0.76 && size > 20);
   ctx.shadowColor = 'rgba(0,0,0,0.45)';
   ctx.shadowBlur = W * 0.02;
   ctx.fillText(title, W / 2, y + h / 2 + W * 0.004);
@@ -826,7 +1025,7 @@ function artPanel(ctx, W, y, h, dark) {
     const cy2 = y + h * (0.55 + Math.random() * 0.55);
     const r = W * (0.06 + Math.random() * 0.16);
     const cg = ctx.createRadialGradient(x, cy2, 0, x, cy2, r);
-    cg.addColorStop(0, dark ? 'rgba(120,60,90,0.30)' : 'rgba(255,255,255,0.42)');
+    cg.addColorStop(0, dark ? 'rgba(78,34,52,0.22)' : 'rgba(255,255,255,0.42)');
     cg.addColorStop(1, 'rgba(255,255,255,0)');
     ctx.fillStyle = cg;
     ctx.beginPath();
@@ -844,13 +1043,23 @@ function artPanel(ctx, W, y, h, dark) {
 function cardFooter(ctx, W, H, text, ink) {
   ctx.save();
   ctx.fillStyle = ink;
-  ctx.globalAlpha = 0.92;
-  ctx.font = '400 ' + Math.round(W * 0.044) + 'px "EB Garamond", Georgia, serif';
+  ctx.globalAlpha = 0.95;
+  // Sized to stay legible once the card is only ~150 screen pixels wide.
+  const size = Math.round(W * 0.066);
+  const lead = W * 0.082;
+  ctx.font = '600 ' + size + 'px "EB Garamond", Georgia, serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  const lines = wrapText(ctx, text, W * 0.74);
-  const startY = H - W * 0.125 - lines.length * W * 0.056;
-  lines.forEach((l, i) => ctx.fillText(l, W / 2, startY + i * W * 0.056));
+  let lines = wrapText(ctx, text, W * 0.78);
+  // Very long rules text drops a step rather than colliding with the art.
+  if (lines.length > 4) {
+    ctx.font = '600 ' + Math.round(W * 0.056) + 'px "EB Garamond", Georgia, serif';
+    lines = wrapText(ctx, text, W * 0.8);
+  }
+  const startY = H - W * 0.13 - lines.length * lead;
+  ctx.shadowColor = 'rgba(0,0,0,0.25)';
+  ctx.shadowBlur = W * 0.006;
+  lines.forEach((l, i) => ctx.fillText(l, W / 2, startY + i * lead));
   ctx.restore();
 }
 
@@ -865,8 +1074,8 @@ export function makeCardFaceTexture(card) {
   cardFrame(ctx, W, H, accent, dark);
   cardBanner(ctx, W, cardTitle(card), W * 0.1, accent.ink);
 
-  const panelY = W * 0.29;
-  const panelH = W * 0.86;
+  const panelY = W * 0.285;
+  const panelH = W * 0.76;
   artPanel(ctx, W, panelY, panelH, dark);
 
   const cx = W / 2;
@@ -874,7 +1083,7 @@ export function makeCardFaceTexture(card) {
 
   if (card.type === 'path') {
     // Show the actual span, drawn top-down and inset in the frame.
-    const S = Math.round(W * 0.62);
+    const S = Math.round(W * 0.56);
     const tile = createCanvas(S, S);
     const edges = {
       n: card.edges.includes('N'),
@@ -943,7 +1152,7 @@ export function makeCardFaceTexture(card) {
   ctx.save();
   ctx.fillStyle = accent.ink;
   ctx.globalAlpha = 0.8;
-  ctx.font = '700 ' + Math.round(W * 0.05) + 'px Cinzel, Georgia, serif';
+  ctx.font = '700 ' + Math.round(W * 0.058) + 'px Cinzel, Georgia, serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   const pip = card.type === 'path' ? (card.passable ? 'SPAN' : 'BROKEN')
@@ -1052,36 +1261,7 @@ export function makeRoleTexture(role) {
     drawWings(ctx, cx, cy - W * 0.06, W * 0.16, false);
     drawHammer(ctx, cx, cy + W * 0.2, W * 0.14, false);
   } else {
-    // Horns and an ember-lit glare.
-    ctx.save();
-    ctx.translate(cx, cy);
-    ctx.globalCompositeOperation = 'lighter';
-    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, W * 0.32);
-    g.addColorStop(0, 'rgba(255,90,50,0.55)');
-    g.addColorStop(1, 'rgba(140,10,20,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(-W * 0.4, -W * 0.4, W * 0.8, W * 0.8);
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = '#1b0a10';
-    ctx.strokeStyle = '#c0303a';
-    ctx.lineWidth = W * 0.012;
-    [-1, 1].forEach((s) => {
-      ctx.beginPath();
-      ctx.moveTo(s * W * 0.08, -W * 0.02);
-      ctx.quadraticCurveTo(s * W * 0.3, -W * 0.14, s * W * 0.24, -W * 0.36);
-      ctx.quadraticCurveTo(s * W * 0.16, -W * 0.16, s * W * 0.03, -W * 0.06);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    });
-    ctx.fillStyle = '#ff6a3d';
-    [-1, 1].forEach((s) => {
-      ctx.beginPath();
-      ctx.ellipse(s * W * 0.09, W * 0.04, W * 0.05, W * 0.026, s * 0.25, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    ctx.restore();
-    drawWings(ctx, cx, cy + W * 0.24, W * 0.13, true);
+    drawHornsAndFire(ctx, cx, cy + W * 0.05, W * 0.185);
   }
 
   cardFooter(ctx, W, H, builder
@@ -1202,13 +1382,13 @@ export function makeSkyTexture(w = 64, h = 512) {
   // The band around v = 0.5 is the horizon; it is pinned to the scene fog colour
   // so the far edge of the cloud floor dissolves into the sky with no seam.
   g.addColorStop(0.00, '#1f5c9e');
-  g.addColorStop(0.18, '#3f86c9');
-  g.addColorStop(0.34, '#79b4e4');
-  g.addColorStop(0.44, '#a9cdec');
-  g.addColorStop(0.49, '#c2dcf4');
-  g.addColorStop(0.58, '#c2dcf4');
-  g.addColorStop(0.70, '#e4eefb');
-  g.addColorStop(0.82, '#ffe4b4');
+  g.addColorStop(0.16, '#3f86c9');
+  g.addColorStop(0.30, '#79b4e4');
+  g.addColorStop(0.38, '#a9cdec');
+  g.addColorStop(0.44, '#c2dcf4');
+  g.addColorStop(0.62, '#c2dcf4');
+  g.addColorStop(0.74, '#d8e6f6');
+  g.addColorStop(0.88, '#ffe4b4');
   g.addColorStop(1.00, '#e8a271');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);

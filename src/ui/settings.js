@@ -128,7 +128,7 @@ export function openSettingsModal(onChange) {
 
   body.appendChild(el('h3', { text: 'Sound' }));
   body.appendChild(row('Master volume', null, slider('master', 0, 1, 0.01, (v) => Math.round(v * 100) + '%', apply)));
-  body.appendChild(row('Effects', 'Every chime, crack and curse is synthesised live.',
+  body.appendChild(row('Effects', 'Synthesised live — no sound files.',
     slider('sfx', 0, 1, 0.01, (v) => Math.round(v * 100) + '%', apply)));
   body.appendChild(row('Music', null, slider('music', 0, 1, 0.01, (v) => Math.round(v * 100) + '%', apply)));
   body.appendChild(row('Mute everything', null, toggle('muted', apply)));
@@ -149,11 +149,12 @@ export function openSettingsModal(onChange) {
     .map(([v, l]) => el('option', { value: v, text: l, selected: matchPreset(settings) === v })));
   body.appendChild(row('Quality preset', null, presetSelect));
 
-  body.appendChild(row('Frame rate cap', 'Lower caps save battery on laptops.',
+  body.appendChild(row('Frame rate cap', 'Lower caps save battery.',
     select('fpsCap', [[30, '30 fps'], [45, '45 fps'], [60, '60 fps'], [120, '120 fps'], [0, 'Unlimited']], apply)));
-  body.appendChild(row('Anti-aliasing', 'Smooths jagged edges; costs a little performance.', toggle('antialias', apply)));
+  body.appendChild(row('Anti-aliasing', 'Smooths jagged edges.', toggle('antialias', apply)));
   body.appendChild(row('Resolution scale', 'Below 100% renders smaller and upscales.',
     slider('resolution', 0.5, 2, 0.1, (v) => Math.round(v * 100) + '%', apply)));
+
   body.appendChild(row('Shadows', null, toggle('shadows', apply)));
   body.appendChild(row('Cloud density', null,
     slider('cloudCount', 0, 200, 10, (v) => String(Math.round(v)), apply)));
@@ -178,6 +179,7 @@ export function openSettingsModal(onChange) {
 
   openModal({
     title: 'Settings',
+    wide: true,
     body,
     actions: [
       {
