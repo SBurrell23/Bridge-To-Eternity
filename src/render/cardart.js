@@ -141,40 +141,65 @@ function drawDeck(ctx, S, dir, from, to, width) {
   ctx.restore();
 }
 
-function drawRift(ctx, S, dir, at, width) {
-  // A severed span: the deck stops and there is nothing but a red-lit chasm.
+/**
+ * The severed end of a stub: a ragged stone face looking inward over a chasm.
+ * `at` is the distance from the tile centre where the deck stops.
+ */
+function drawBreak(ctx, S, dir, at, width) {
   const c = S / 2;
   const [dx, dy] = DIR_VEC[dir];
-  const cx = c + dx * at;
-  const cy = c + dy * at;
-
   ctx.save();
-  ctx.translate(cx, cy);
-  ctx.rotate(Math.atan2(dy, dx));
+  ctx.translate(c + dx * at, c + dy * at);
+  ctx.rotate(Math.atan2(-dy, -dx));       // local +x points in towards the void
 
   const half = width / 2;
-  const grad = ctx.createLinearGradient(-S * 0.06, 0, S * 0.02, 0);
-  grad.addColorStop(0, 'rgba(40,10,16,0)');
-  grad.addColorStop(0.5, '#2a0a12');
-  grad.addColorStop(1, '#12060a');
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.moveTo(-S * 0.05, -half);
-  for (let i = 0; i <= 6; i++) {
-    ctx.lineTo(-S * 0.02 + Math.random() * S * 0.05, -half + (width * i) / 6);
+  const teeth = [];
+  for (let i = 0; i <= 7; i++) {
+    teeth.push({ y: -half + (width * i) / 7, x: (i % 2 ? 0.055 : 0.012) * S * (0.6 + Math.random() * 0.8) });
   }
-  ctx.lineTo(-S * 0.05, half);
+
+  // The raw stone of the break.
+  ctx.beginPath();
+  ctx.moveTo(-S * 0.04, -half);
+  for (const t of teeth) ctx.lineTo(t.x, t.y);
+  ctx.lineTo(-S * 0.04, half);
   ctx.closePath();
+  const g = ctx.createLinearGradient(-S * 0.05, 0, S * 0.06, 0);
+  g.addColorStop(0, '#b9aa8e');
+  g.addColorStop(0.55, '#6b5c46');
+  g.addColorStop(1, '#2a1c16');
+  ctx.fillStyle = g;
   ctx.fill();
 
-  // Embers along the broken lip.
-  ctx.globalCompositeOperation = 'lighter';
-  for (let i = 0; i < 10; i++) {
+  // Fissures running back into the deck.
+  ctx.strokeStyle = 'rgba(40,26,20,0.5)';
+  ctx.lineWidth = S * 0.008;
+  for (let i = 0; i < 3; i++) {
+    const y = -half + width * (0.25 + i * 0.25);
+    ctx.beginPath();
+    ctx.moveTo(-S * 0.03, y);
+    ctx.lineTo(-S * 0.09, y + (Math.random() - 0.5) * S * 0.04);
+    ctx.stroke();
+  }
+
+  // Rubble spilling off the lip.
+  ctx.fillStyle = '#4c3a2c';
+  for (let i = 0; i < 5; i++) {
     const y = -half + Math.random() * width;
-    const x = -S * 0.03 + Math.random() * S * 0.04;
-    const r = S * (0.004 + Math.random() * 0.012);
+    const r = S * (0.008 + Math.random() * 0.014);
+    ctx.beginPath();
+    ctx.ellipse(S * (0.02 + Math.random() * 0.05), y, r, r * 0.75, Math.random(), 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Embers along the edge, so the break glows without lighting the whole tile.
+  ctx.globalCompositeOperation = 'lighter';
+  for (let i = 0; i < 7; i++) {
+    const y = -half + Math.random() * width;
+    const x = -S * 0.005 + Math.random() * S * 0.02;
+    const r = S * (0.004 + Math.random() * 0.011);
     const eg = ctx.createRadialGradient(x, y, 0, x, y, r);
-    eg.addColorStop(0, 'rgba(255,150,60,0.9)');
+    eg.addColorStop(0, 'rgba(255,158,70,0.95)');
     eg.addColorStop(1, 'rgba(200,40,20,0)');
     ctx.fillStyle = eg;
     ctx.beginPath();
@@ -184,18 +209,49 @@ function drawRift(ctx, S, dir, at, width) {
   ctx.restore();
 }
 
+/** The hole in the middle of a severed span: nothing crosses it. */
+function drawVoid(ctx, S, radius) {
+  const c = S / 2;
+  ctx.save();
+  ctx.beginPath();
+  for (let i = 0; i <= 18; i++) {
+    const a = (i / 18) * Math.PI * 2;
+    const r = radius * (0.82 + Math.random() * 0.3);
+    const x = c + Math.cos(a) * r;
+    const y = c + Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  const g = ctx.createRadialGradient(c, c, 0, c, c, radius * 1.1);
+  g.addColorStop(0, '#080407');
+  g.addColorStop(0.6, '#170a10');
+  g.addColorStop(1, '#2c1620');
+  ctx.fillStyle = g;
+  ctx.fill();
+
+  ctx.globalCompositeOperation = 'lighter';
+  const eg = ctx.createRadialGradient(c, c + radius * 0.35, 0, c, c + radius * 0.35, radius * 0.9);
+  eg.addColorStop(0, 'rgba(206,66,30,0.5)');
+  eg.addColorStop(1, 'rgba(140,16,20,0)');
+  ctx.fillStyle = eg;
+  ctx.beginPath();
+  ctx.arc(c, c, radius * 1.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 function drawTileBase(ctx, S, dark) {
   const g = ctx.createRadialGradient(S / 2, S / 2, S * 0.1, S / 2, S / 2, S * 0.72);
   if (dark) {
-    g.addColorStop(0, '#4a3550');
-    g.addColorStop(1, '#241a2c');
+    g.addColorStop(0, '#8b7f90');
+    g.addColorStop(1, '#4d4257');
   } else {
     g.addColorStop(0, '#b9cde4');
     g.addColorStop(1, '#7f97b4');
   }
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, S, S);
-  veins(ctx, S, S, 14, dark ? '#120a18' : '#61789a', 0.22);
+  veins(ctx, S, S, 14, dark ? '#2a1c30' : '#61789a', 0.22);
 
   // Cloud fluff creeping in from the corners.
   ctx.save();
@@ -224,9 +280,11 @@ export function drawSpanArt(ctx, S, edges, passable) {
   drawTileBase(ctx, S, !passable);
   const width = S * 0.40;
   const open = ['n', 'e', 's', 'w'].filter((d) => edges[d]);
-  const stopAt = passable ? S / 2 : S * 0.34;
-
-  for (const d of open) drawDeck(ctx, S, d, S / 2, 0, width);
+  // A whole span runs edge to centre; a severed one stops short of it, leaving
+  // a hole nothing can cross. The stubs must NOT meet in the middle -- that is
+  // the whole point of the card.
+  const gap = S * 0.2;
+  for (const d of open) drawDeck(ctx, S, d, S / 2, passable ? 0 : gap, width);
 
   if (passable) {
     // Central rosette where the spans meet.
@@ -256,33 +314,8 @@ export function drawSpanArt(ctx, S, edges, passable) {
     }
     ctx.restore();
   } else {
-    // Cut each stub back and burn a chasm across it.
-    ctx.save();
-    for (const d of open) {
-      const r = spanRect(S, d, stopAt, S / 2 - 1, width + 4);
-      ctx.clearRect(r.x, r.y, r.w, r.h);
-    }
-    ctx.restore();
-    // Repaint the base only inside the cleared band.
-    const tmp = createCanvas(S, S);
-    const tctx = tmp.getContext('2d');
-    drawTileBase(tctx, S, true);
-    ctx.save();
-    ctx.globalCompositeOperation = 'destination-over';
-    ctx.drawImage(tmp, 0, 0);
-    ctx.restore();
-    for (const d of open) drawRift(ctx, S, d, stopAt, width);
-
-    // A sullen glow at the heart of the broken tile.
-    const c = S / 2;
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const hg = ctx.createRadialGradient(c, c, 0, c, c, S * 0.3);
-    hg.addColorStop(0, 'rgba(190,40,30,0.55)');
-    hg.addColorStop(1, 'rgba(120,10,20,0)');
-    ctx.fillStyle = hg;
-    ctx.fillRect(0, 0, S, S);
-    ctx.restore();
+    drawVoid(ctx, S, gap * 1.05);
+    for (const d of open) drawBreak(ctx, S, d, gap, width);
   }
 
   // Outer bevel so tiles read as separate slabs.
@@ -433,53 +466,93 @@ function drawQuestion(ctx, S) {
 export function drawHalo(ctx, cx, cy, R, broken) {
   ctx.save();
   ctx.translate(cx, cy);
+
   if (!broken) {
     ctx.globalCompositeOperation = 'lighter';
-    const g = ctx.createRadialGradient(0, 0, R * 0.2, 0, 0, R * 1.5);
-    g.addColorStop(0, 'rgba(255,240,180,0.55)');
+    const g = ctx.createRadialGradient(0, 0, R * 0.2, 0, 0, R * 1.6);
+    g.addColorStop(0, 'rgba(255,240,180,0.6)');
     g.addColorStop(1, 'rgba(255,200,80,0)');
     ctx.fillStyle = g;
     ctx.beginPath();
-    ctx.arc(0, 0, R * 1.5, 0, Math.PI * 2);
+    ctx.arc(0, 0, R * 1.6, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalCompositeOperation = 'source-over';
-  }
-  ctx.lineWidth = R * 0.2;
-  ctx.strokeStyle = broken ? '#6b5a48' : goldGradient(ctx, -R, -R, R, R);
-  ctx.beginPath();
-  if (broken) {
-    ctx.arc(0, 0, R, Math.PI * 0.15, Math.PI * 1.15);
-    ctx.stroke();
+
+    ctx.lineWidth = R * 0.26;
+    ctx.strokeStyle = goldGradient(ctx, -R, -R, R, R);
     ctx.beginPath();
-    ctx.arc(0, 0, R, Math.PI * 1.35, Math.PI * 1.95);
+    ctx.ellipse(0, 0, R, R * 0.36, 0, 0, Math.PI * 2);
     ctx.stroke();
-    // Smoke curling from the snuffed ring.
-    ctx.globalAlpha = 0.5;
-    ctx.strokeStyle = '#403040';
-    ctx.lineWidth = R * 0.1;
-    for (let i = 0; i < 3; i++) {
-      ctx.beginPath();
-      ctx.moveTo(R * (0.4 + i * 0.2), -R * 0.4);
-      ctx.bezierCurveTo(R * 0.9, -R * 1.1, R * 0.2, -R * 1.4, R * 0.6, -R * 2.0);
-      ctx.stroke();
-    }
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = '#c0303a';
-    ctx.lineWidth = R * 0.07;
-    ctx.beginPath();
-    ctx.moveTo(-R * 0.9, R * 0.5);
-    ctx.lineTo(R * 0.9, -R * 0.5);
-    ctx.stroke();
-  } else {
-    ctx.arc(0, 0, R, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.globalAlpha = 0.7;
+    ctx.globalAlpha = 0.8;
     ctx.strokeStyle = '#fffbe8';
-    ctx.lineWidth = R * 0.06;
+    ctx.lineWidth = R * 0.08;
     ctx.beginPath();
-    ctx.arc(0, 0, R * 0.88, Math.PI * 1.1, Math.PI * 1.8);
+    ctx.ellipse(0, -R * 0.04, R * 0.9, R * 0.3, 0, Math.PI * 1.08, Math.PI * 1.92);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  // Snuffed: a cold ring cracked open, one piece fallen away, smoke rising.
+  const ring = (a0, a1, lw) => {
+    ctx.lineWidth = lw;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, R, R * 0.36, 0, a0, a1);
+    ctx.stroke();
+  };
+
+  ctx.strokeStyle = '#2b2229';
+  ring(Math.PI * 0.12, Math.PI * 0.92, R * 0.32);
+  ring(Math.PI * 1.12, Math.PI * 1.78, R * 0.32);
+  const dull = ctx.createLinearGradient(-R, 0, R, 0);
+  dull.addColorStop(0, '#8e8577');
+  dull.addColorStop(0.5, '#b5a891');
+  dull.addColorStop(1, '#6f6659');
+  ctx.strokeStyle = dull;
+  ring(Math.PI * 0.12, Math.PI * 0.92, R * 0.2);
+  ring(Math.PI * 1.12, Math.PI * 1.78, R * 0.2);
+
+  // The fallen shard, tumbling below the gap.
+  ctx.save();
+  ctx.translate(R * 0.78, R * 0.62);
+  ctx.rotate(0.7);
+  ctx.strokeStyle = '#2b2229';
+  ctx.lineWidth = R * 0.3;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, R * 0.3, R * 0.11, 0, Math.PI * 0.1, Math.PI * 1.0);
+  ctx.stroke();
+  ctx.strokeStyle = '#7d7466';
+  ctx.lineWidth = R * 0.18;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, R * 0.3, R * 0.11, 0, Math.PI * 0.1, Math.PI * 1.0);
+  ctx.stroke();
+  ctx.restore();
+
+  // Smoke off the broken ends.
+  ctx.globalAlpha = 0.45;
+  ctx.strokeStyle = '#6e6472';
+  ctx.lineCap = 'round';
+  for (let i = 0; i < 3; i++) {
+    const x = R * (0.86 - i * 0.1);
+    ctx.lineWidth = R * (0.1 - i * 0.02);
+    ctx.beginPath();
+    ctx.moveTo(x, -R * 0.1);
+    ctx.bezierCurveTo(x + R * 0.34, -R * 0.6, x - R * 0.28, -R * 0.95, x + R * 0.1, -R * 1.5);
     ctx.stroke();
   }
+  ctx.globalAlpha = 1;
+
+  // One last ember at the break.
+  ctx.globalCompositeOperation = 'lighter';
+  const eg = ctx.createRadialGradient(R * 0.92, 0, 0, R * 0.92, 0, R * 0.34);
+  eg.addColorStop(0, 'rgba(255,150,60,0.85)');
+  eg.addColorStop(1, 'rgba(200,40,20,0)');
+  ctx.fillStyle = eg;
+  ctx.beginPath();
+  ctx.arc(R * 0.92, 0, R * 0.34, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.restore();
 }
 
@@ -516,66 +589,10 @@ const WING_ROWS = [
 ];
 
 export function drawWings(ctx, cx, cy, R, broken) {
-  const feather = (dir) => {
-    ctx.save();
-    ctx.scale(dir, 1);
-    ctx.beginPath();
-    ctx.moveTo(0, -R * 0.15);
-    ctx.bezierCurveTo(R * 0.5, -R * 0.85, R * 1.25, -R * 0.6, R * 1.45, R * 0.05);
-    ctx.bezierCurveTo(R * 1.1, R * 0.1, R * 0.9, R * 0.35, R * 0.62, R * 0.62);
-    ctx.bezierCurveTo(R * 0.5, R * 0.3, R * 0.28, R * 0.15, 0, R * 0.2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    // Feather ribs.
-    ctx.globalAlpha = 0.45;
-    ctx.lineWidth = R * 0.035;
-    for (let i = 1; i <= 4; i++) {
-      ctx.beginPath();
-      ctx.moveTo(R * 0.12 * i, -R * 0.1);
-      ctx.quadraticCurveTo(R * 0.42 * i, R * 0.1, R * 0.33 * i, R * 0.45);
-      ctx.stroke();
-    }
-    ctx.restore();
-  };
-
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.lineWidth = R * 0.07;
-  if (broken) {
-    ctx.fillStyle = '#8d8394';
-    ctx.strokeStyle = '#4b4152';
-    feather(1);
-    // The other wing is gone; only shorn stubs and drifting feathers remain.
-    ctx.save();
-    ctx.scale(-1, 1);
-    ctx.beginPath();
-    ctx.moveTo(0, -R * 0.15);
-    ctx.bezierCurveTo(R * 0.35, -R * 0.6, R * 0.6, -R * 0.42, R * 0.62, -R * 0.05);
-    ctx.lineTo(R * 0.2, R * 0.2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-    ctx.restore();
-    ctx.fillStyle = '#6d6376';
-    for (let i = 0; i < 5; i++) {
-      const x = -R * (0.7 + Math.random() * 0.9);
-      const y = R * (0.5 + Math.random() * 1.1);
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.rotate(Math.random() * Math.PI);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, R * 0.07, R * 0.22, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
-    ctx.strokeStyle = '#c0303a';
-    ctx.lineWidth = R * 0.07;
-    ctx.beginPath();
-    ctx.moveTo(-R * 1.2, R * 0.7);
-    ctx.lineTo(R * 1.2, -R * 0.7);
-    ctx.stroke();
-  } else {
+
+  if (!broken) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 1.9);
@@ -594,7 +611,78 @@ export function drawWings(ctx, cx, cy, R, broken) {
       featherFan(ctx, R, true, WING_ROWS);
       ctx.restore();
     });
+    ctx.restore();
+    return;
   }
+
+  // Shorn: one wing whole, the other hacked off halfway. Showing the same wing
+  // twice at two lengths is what makes the loss legible -- a tiny stump beside
+  // a full wing just read as one wing and some debris.
+  ctx.translate(-R * 0.1, 0);
+  ctx.strokeStyle = 'rgba(74,64,86,0.85)';
+  ctx.lineWidth = R * 0.035;
+
+  const whole = [
+    { n: 7, a0: -0.62, a1: 0.42, l0: 1.6, l1: 1.0, w: 0.115, fill: '#b3aaba' },
+    { n: 6, a0: -0.55, a1: 0.38, l0: 1.16, l1: 0.72, w: 0.105, fill: '#cdc5d4' },
+    { n: 5, a0: -0.46, a1: 0.30, l0: 0.74, l1: 0.46, w: 0.095, fill: '#e2dce8' },
+  ];
+  const cut = whole.map((r) => ({
+    ...r,
+    l0: r.l0 * 0.52,
+    l1: r.l1 * 0.52,
+    fill: r.fill === '#b3aaba' ? '#9a90a6' : r.fill === '#cdc5d4' ? '#b6adc2' : '#cfc7da',
+  }));
+
+  ctx.save();
+  ctx.translate(R * 0.08, -R * 0.1);
+  featherFan(ctx, R, true, whole);
+  ctx.restore();
+
+  ctx.save();
+  ctx.scale(-1, 1);
+  ctx.translate(R * 0.08, -R * 0.1);
+  featherFan(ctx, R, true, cut);
+  ctx.restore();
+
+  // The cut itself: a ragged line straight across the shorn wing's tips.
+  ctx.save();
+  ctx.translate(-R * 0.08, -R * 0.1);
+  ctx.strokeStyle = '#c0303a';
+  ctx.lineWidth = R * 0.07;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  for (let i = 0; i <= 6; i++) {
+    const t = i / 6;
+    const a = -0.66 + t * 1.12;
+    const L = R * (0.88 - t * 0.3) * (i % 2 ? 0.92 : 1.06);
+    const x = -Math.cos(a) * L;
+    const y = Math.sin(a) * L;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // Severed feathers drifting down from the cut.
+  ctx.fillStyle = '#a096ad';
+  ctx.strokeStyle = 'rgba(60,48,70,0.75)';
+  ctx.lineWidth = R * 0.03;
+  const drop = [[-1.16, 0.74, 0.55], [-1.5, 1.28, 1.15], [-0.86, 1.42, -0.3]];
+  for (const [fx, fy, rot] of drop) {
+    ctx.save();
+    ctx.translate(R * fx, R * fy);
+    ctx.rotate(rot);
+    ctx.beginPath();
+    ctx.moveTo(0, -R * 0.32);
+    ctx.quadraticCurveTo(R * 0.14, 0, 0, R * 0.32);
+    ctx.quadraticCurveTo(-R * 0.14, 0, 0, -R * 0.32);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
   ctx.restore();
 }
 
@@ -681,43 +769,11 @@ export function drawBuilderEmblem(ctx, cx, cy, R) {
 export function drawHammer(ctx, cx, cy, R, broken) {
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.rotate(-0.5);
-  const headW = R * 1.25;
-  const headH = R * 0.62;
 
-  if (broken) {
-    // Head split in two, haft snapped.
-    ctx.fillStyle = '#7f8794';
-    ctx.strokeStyle = '#3c434f';
-    ctx.lineWidth = R * 0.07;
-    ctx.save();
-    ctx.rotate(-0.35);
-    ctx.translate(-R * 0.35, -R * 0.2);
-    roundRect(ctx, -headW / 2, -headH / 2, headW * 0.46, headH, R * 0.08);
-    ctx.fill(); ctx.stroke();
-    ctx.restore();
-    ctx.save();
-    ctx.rotate(0.4);
-    ctx.translate(R * 0.42, -R * 0.1);
-    roundRect(ctx, headW * 0.04, -headH / 2, headW * 0.46, headH, R * 0.08);
-    ctx.fill(); ctx.stroke();
-    ctx.restore();
-    ctx.fillStyle = '#6a4b2c';
-    ctx.save();
-    ctx.rotate(0.15);
-    roundRect(ctx, -R * 0.11, R * 0.2, R * 0.22, R * 0.6, R * 0.06);
-    ctx.fill(); ctx.stroke();
-    ctx.rotate(0.5);
-    roundRect(ctx, -R * 0.09, R * 0.9, R * 0.18, R * 0.5, R * 0.05);
-    ctx.fill(); ctx.stroke();
-    ctx.restore();
-    ctx.strokeStyle = '#c0303a';
-    ctx.lineWidth = R * 0.07;
-    ctx.beginPath();
-    ctx.moveTo(-R * 1.1, R * 0.9);
-    ctx.lineTo(R * 1.1, -R * 0.9);
-    ctx.stroke();
-  } else {
+  const headW = R * 1.3;
+  const headH = R * 0.66;
+
+  if (!broken) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 1.6);
@@ -726,21 +782,118 @@ export function drawHammer(ctx, cx, cy, R, broken) {
     ctx.fillStyle = g;
     ctx.fillRect(-R * 2, -R * 2, R * 4, R * 4);
     ctx.restore();
+
+    ctx.rotate(-0.3);
     ctx.fillStyle = '#6a4b2c';
     ctx.strokeStyle = '#3a2716';
     ctx.lineWidth = R * 0.06;
     roundRect(ctx, -R * 0.12, -R * 0.1, R * 0.24, R * 1.5, R * 0.07);
-    ctx.fill(); ctx.stroke();
+    ctx.fill();
+    ctx.stroke();
     ctx.fillStyle = goldGradient(ctx, -headW / 2, -headH / 2, headW / 2, headH / 2);
     ctx.strokeStyle = PALETTE.goldDark;
     ctx.lineWidth = R * 0.07;
     roundRect(ctx, -headW / 2, -headH / 2 - R * 0.1, headW, headH, R * 0.1);
-    ctx.fill(); ctx.stroke();
+    ctx.fill();
+    ctx.stroke();
     ctx.globalAlpha = 0.6;
     ctx.fillStyle = '#fffbe8';
     roundRect(ctx, -headW / 2 + R * 0.08, -headH / 2 - R * 0.02, headW - R * 0.16, R * 0.1, R * 0.05);
     ctx.fill();
+    ctx.restore();
+    return;
   }
+
+  // Shattered: the head has split down the middle and the haft has snapped.
+  // The pieces stay close to where they belong so the hammer is still legible;
+  // throwing them apart only read as scattered shapes.
+  const grey = ctx.createLinearGradient(-headW, -headH, headW, headH);
+  grey.addColorStop(0, '#aab1bc');
+  grey.addColorStop(0.5, '#7d848f');
+  grey.addColorStop(1, '#575e69');
+
+  // Haft first, so the head sits over it.
+  ctx.save();
+  ctx.rotate(-0.28);
+  ctx.fillStyle = '#6a4b2c';
+  ctx.strokeStyle = '#33220f';
+  ctx.lineWidth = R * 0.06;
+  ctx.beginPath();
+  ctx.moveTo(-R * 0.12, -R * 0.1);
+  ctx.lineTo(R * 0.12, -R * 0.1);
+  ctx.lineTo(R * 0.15, R * 0.5);
+  ctx.lineTo(-R * 0.04, R * 0.42);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  // The fallen half of the haft.
+  ctx.save();
+  ctx.translate(R * 0.46, R * 1.0);
+  ctx.rotate(0.85);
+  ctx.fillStyle = '#6a4b2c';
+  ctx.strokeStyle = '#33220f';
+  ctx.lineWidth = R * 0.06;
+  ctx.beginPath();
+  ctx.moveTo(-R * 0.12, -R * 0.4);
+  ctx.lineTo(R * 0.1, -R * 0.3);
+  ctx.lineTo(R * 0.12, R * 0.44);
+  ctx.lineTo(-R * 0.12, R * 0.44);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  // The two halves of the head, barely parted, with a jagged split between.
+  const half = (dir, tilt, dx, dy) => {
+    ctx.save();
+    ctx.translate(dx, dy);
+    ctx.rotate(tilt);
+    ctx.fillStyle = grey;
+    ctx.strokeStyle = '#2f353d';
+    ctx.lineWidth = R * 0.07;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(dir * headW * 0.5, -headH * 0.46);
+    ctx.lineTo(dir * headW * 0.5, headH * 0.46);
+    ctx.lineTo(dir * headW * 0.06, headH * 0.46);
+    ctx.lineTo(dir * headW * 0.15, headH * 0.16);
+    ctx.lineTo(dir * headW * 0.03, -headH * 0.06);
+    ctx.lineTo(dir * headW * 0.14, -headH * 0.28);
+    ctx.lineTo(dir * headW * 0.06, -headH * 0.46);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // A highlight along the top face keeps it reading as a hammer head.
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = '#dfe4ea';
+    ctx.fillRect(dir * headW * 0.08, -headH * 0.44, dir * headW * 0.4, headH * 0.12);
+    ctx.restore();
+  };
+  half(-1, -0.34, -R * 0.16, -R * 0.62);
+  half(1, -0.16, R * 0.14, -R * 0.52);
+
+  // Shards off the split.
+  ctx.fillStyle = '#8d949f';
+  ctx.strokeStyle = '#2f353d';
+  ctx.lineWidth = R * 0.035;
+  const shards = [[-0.05, -1.22, 0.2], [-0.92, -0.28, 0.5], [0.86, -0.9, -0.5]];
+  for (const [sx, sy, rot] of shards) {
+    ctx.save();
+    ctx.translate(R * sx, R * sy);
+    ctx.rotate(rot);
+    ctx.beginPath();
+    ctx.moveTo(0, -R * 0.13);
+    ctx.lineTo(R * 0.14, 0);
+    ctx.lineTo(0, R * 0.11);
+    ctx.lineTo(-R * 0.09, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
   ctx.restore();
 }
 
