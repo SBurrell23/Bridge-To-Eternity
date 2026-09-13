@@ -1,0 +1,11 @@
+{
+  "name": "bridge-to-eternity",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A 3D peer-to-peer sky-bridge card game: Builders race to reach the Eternal Gates while the Fallen sabotage them.",
+  "scripts": {
+    "test": "node tests/sim.mjs",
+    "start": "npx --yes http-server . -p 4173 -c-1"
+  }
+}
