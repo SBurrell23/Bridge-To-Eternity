@@ -1548,95 +1548,128 @@ export const TOOL_NAMES = TOOL_INFO;
 // ---------------------------------------------------------------------------
 // Cursors. A pointer you can actually aim with, wearing the mark of your side.
 // ---------------------------------------------------------------------------
-export function makeCursor(kind, size = 40) {
+export const CURSOR_SIZE = 34;
+
+// Where the pointer actually points, in canvas pixels. The glyph is free to
+// sit anywhere around it -- the hotspot is what the browser aims with.
+export const CURSOR_HOTSPOT = {
+  builder: [14, 2],
+  fallen: [4, 4],
+};
+
+export function makeCursor(kind, size = CURSOR_SIZE) {
   const c = createCanvas(size, size);
   const ctx = c.getContext('2d');
-  const S = size / 40;
-  const fallen = kind === 'fallen';
+  const u = size / 34;                       // one design unit
+  const P = (x, y) => [x * u, y * u];
+
+  // Silhouette first, fill second: the heavy dark outline is what keeps the
+  // glyph readable at 34px over clouds, gold panels and dark modals alike.
+  const outlined = (path, fill, line, lw) => {
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = line;
+    ctx.lineWidth = lw * u;
+    path();
+    ctx.stroke();
+    ctx.fillStyle = fill;
+    path();
+    ctx.fill();
+  };
 
   ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.55)';
-  ctx.shadowBlur = 3 * S;
-  ctx.shadowOffsetY = 1 * S;
+  ctx.shadowColor = 'rgba(0,0,0,0.5)';
+  ctx.shadowBlur = 2 * u;
+  ctx.shadowOffsetY = 0.8 * u;
 
-  if (fallen) {
-    // Three barbed prongs sweeping back from the point.
-    ctx.strokeStyle = '#3a0a10';
-    ctx.lineWidth = 4.4 * S;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    const prongs = [[16, 26], [23, 20], [22, 29]];
-    for (let pass = 0; pass < 2; pass++) {
-      ctx.strokeStyle = pass === 0 ? '#3a0a10' : '#e0402f';
-      ctx.lineWidth = (pass === 0 ? 5.2 : 2.6) * S;
-      for (const [px, py] of prongs) {
-        ctx.beginPath();
-        ctx.moveTo(3 * S, 3 * S);
-        ctx.lineTo(px * S, py * S);
-        ctx.stroke();
-      }
+  if (kind === 'fallen') {
+    // A three-tined fork angled up-left, the middle tine on the hotspot.
+    ctx.translate(...P(12, 12));
+    ctx.rotate(-Math.PI / 4);
+
+    // Tapered tines with a real point, not a stroked hairline.
+    const tine = (x, len, w) => () => {
       ctx.beginPath();
-      ctx.moveTo(3 * S, 3 * S);
-      ctx.lineTo(30 * S, 34 * S);
-      ctx.stroke();
-    }
-    ctx.fillStyle = '#ffd0a0';
-    ctx.beginPath();
-    ctx.arc(3.2 * S, 3.2 * S, 2.1 * S, 0, Math.PI * 2);
-    ctx.fill();
+      ctx.moveTo(...P(x - w, 1.2));
+      ctx.lineTo(...P(x - w, -len + 3.2));
+      ctx.lineTo(...P(x, -len));
+      ctx.lineTo(...P(x + w, -len + 3.2));
+      ctx.lineTo(...P(x + w, 1.2));
+      ctx.closePath();
+    };
+    outlined(tine(-5.2, 9.2, 1.45), '#d62a24', '#2e0509', 1.7);
+    outlined(tine(5.2, 9.2, 1.45), '#d62a24', '#2e0509', 1.7);
+    outlined(tine(0, 12.4, 1.6), '#ff4a36', '#2e0509', 1.7);
+
+    // Collar joining the tines.
+    outlined(() => {
+      ctx.beginPath();
+      ctx.moveTo(...P(-7, 0.2));
+      ctx.lineTo(...P(7, 0.2));
+      ctx.lineTo(...P(7, 3.0));
+      ctx.lineTo(...P(-7, 3.0));
+      ctx.closePath();
+    }, '#b8211c', '#2e0509', 1.7);
+
+    // Haft.
+    outlined(() => {
+      ctx.beginPath();
+      ctx.moveTo(...P(-1.7, 2.6));
+      ctx.lineTo(...P(1.7, 2.6));
+      ctx.lineTo(...P(1.7, 15.5));
+      ctx.lineTo(...P(-1.7, 15.5));
+      ctx.closePath();
+    }, '#9c1a17', '#2e0509', 1.7);
   } else {
-    // An arrow with a pair of wings folded either side of it.
+    // A pointer with a wing either side. The arrow sits mid-canvas so both
+    // wings have room; the hotspot keeps the tip honest.
     const wing = (dir) => {
       ctx.save();
-      ctx.translate(12 * S, 14 * S);
+      ctx.translate(...P(14.2, 9.4));
       ctx.scale(dir, 1);
-      ctx.rotate(-1.05);
-      ctx.fillStyle = 'rgba(255,252,240,0.96)';
-      ctx.strokeStyle = 'rgba(150,112,32,0.75)';
-      ctx.lineWidth = 1.1 * S;
-      for (let i = 0; i < 4; i++) {
-        const t = i / 3;
-        const a = -0.62 + t * 1.05;
-        const L = (17 - t * 6) * S;
-        const w = 2.7 * S;
-        const tx = Math.cos(a) * L;
-        const ty = Math.sin(a) * L;
-        const nx = -Math.sin(a) * w;
-        const ny = Math.cos(a) * w;
+      ctx.rotate(-0.22);
+      const path = () => {
         ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.quadraticCurveTo(tx * 0.45 + nx, ty * 0.45 + ny, tx, ty);
-        ctx.quadraticCurveTo(tx * 0.45 - nx, ty * 0.45 - ny, 0, 0);
+        ctx.moveTo(...P(0, 0));
+        // leading edge sweeping up and out
+        ctx.bezierCurveTo(...P(3.4, -4.6), ...P(8.4, -5.8), ...P(11.2, -2.6));
+        // scalloped trailing edge coming back to the shoulder
+        ctx.quadraticCurveTo(...P(9.4, -1.4), ...P(8.4, 1.2));
+        ctx.quadraticCurveTo(...P(6.9, -0.7), ...P(5.4, 1.8));
+        ctx.quadraticCurveTo(...P(4.1, -0.4), ...P(2.7, 1.9));
+        ctx.quadraticCurveTo(...P(1.5, 0.3), ...P(0, 0));
         ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-      }
+      };
+      outlined(path, '#fffdf4', '#6b4d13', 1.9);
       ctx.restore();
     };
-    wing(1);
     wing(-1);
+    wing(1);
 
-    ctx.beginPath();
-    ctx.moveTo(3 * S, 2 * S);
-    ctx.lineTo(3 * S, 27 * S);
-    ctx.lineTo(10 * S, 21 * S);
-    ctx.lineTo(15 * S, 32 * S);
-    ctx.lineTo(20 * S, 29 * S);
-    ctx.lineTo(15 * S, 19 * S);
-    ctx.lineTo(23 * S, 18 * S);
-    ctx.closePath();
-    ctx.fillStyle = goldGradient(ctx, 3 * S, 2 * S, 23 * S, 32 * S);
-    ctx.fill();
-    ctx.strokeStyle = '#4a3410';
-    ctx.lineWidth = 1.6 * S;
-    ctx.stroke();
+    outlined(() => {
+      ctx.beginPath();
+      ctx.moveTo(...P(14, 2.4));
+      ctx.lineTo(...P(14, 17.6));
+      ctx.lineTo(...P(17.9, 14.0));
+      ctx.lineTo(...P(20.5, 20.2));
+      ctx.lineTo(...P(23.1, 19.0));
+      ctx.lineTo(...P(20.6, 13.1));
+      ctx.lineTo(...P(25.7, 12.6));
+      ctx.closePath();
+    }, goldGradient(ctx, ...P(14, 2), ...P(26, 20)), '#4a3410', 2.1);
   }
+
   ctx.restore();
   return c.toDataURL();
 }
 
 const cursorCache = {};
+
+/** The full CSS cursor value, hotspot included. */
 export function cursorFor(kind) {
-  if (!cursorCache[kind]) cursorCache[kind] = makeCursor(kind);
+  if (!cursorCache[kind]) {
+    const hot = CURSOR_HOTSPOT[kind] || [2, 2];
+    cursorCache[kind] = 'url(' + makeCursor(kind) + ') ' + hot[0] + ' ' + hot[1] + ', auto';
+  }
   return cursorCache[kind];
 }

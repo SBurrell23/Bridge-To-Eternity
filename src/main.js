@@ -393,7 +393,7 @@ function applyCursor() {
   const kind = role === 'fallen' ? 'fallen' : 'builder';
   if (app.cursorKind === kind) return;
   app.cursorKind = kind;
-  document.body.style.cursor = 'url(' + cursorFor(kind) + ') 3 2, auto';
+  document.body.style.cursor = cursorFor(kind);
 }
 
 function refreshSelectionVisuals() {
