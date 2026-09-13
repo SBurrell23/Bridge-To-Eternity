@@ -12,7 +12,7 @@ import { HostSession, ClientSession } from './net/session.js';
 import { settings, saveSettings, qualityOf, openSettingsModal } from './ui/settings.js';
 import { Hud, openHelp } from './ui/hud.js';
 import { Menu } from './ui/menu.js';
-import { $, toast, banner, setScreen, openModal, closeModal, isModalOpen } from './ui/dom.js';
+import { $, toast, banner, clearBanner, setScreen, openModal, closeModal, isModalOpen } from './ui/dom.js';
 import { GOAL_CELLS, key as cellKey } from './game/board.js';
 import { cardTitle } from './game/cards.js';
 
@@ -573,9 +573,14 @@ function onView(view) {
     app.hud.showRoleReveal(view.you.role, () => {});
   }
 
-  if (prev && prev.currentPlayerId !== view.currentPlayerId && myTurn()) {
-    audio.play('turn');
-    banner('Your move', false, 1400);
+  if (prev && prev.currentPlayerId !== view.currentPlayerId) {
+    if (myTurn()) {
+      audio.play('turn');
+      banner('Your move', false, 1400);
+    } else {
+      // Don't leave "Your move" hanging over somebody else's turn.
+      clearBanner();
+    }
   }
 
   if (view.phase === 'roundEnd' && (!prev || prev.phase !== 'roundEnd')) {

@@ -57,6 +57,14 @@ export function banner(text, dark = false, ms = 2600) {
   b._timer = setTimeout(() => b.classList.add('hidden'), ms);
 }
 
+/** Pull a banner early -- e.g. "Your move" once the turn has moved on. */
+export function clearBanner() {
+  const b = $('#banner');
+  if (!b) return;
+  clearTimeout(b._timer);
+  b.classList.add('hidden');
+}
+
 // --- modal ----------------------------------------------------------------
 const modal = {
   root: null,
