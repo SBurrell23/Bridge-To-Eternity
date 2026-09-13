@@ -131,8 +131,8 @@ export class BoardView {
     }
 
     if (tile.kind === 'start') {
-      const g = glowSprite('255,236,180', 9, 0.55);
-      g.position.y = 1.2;
+      const g = glowSprite('255,236,180', 6.5, 0.3);
+      g.position.y = 1.4;
       group.add(g);
     }
 
