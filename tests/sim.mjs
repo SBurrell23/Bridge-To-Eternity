@@ -1,7 +1,9 @@
 // Headless rules harness: plays whole games with scripted "bots" so the engine
 // can be exercised without a browser. Run with: node tests/sim.mjs
 import { Engine } from '../src/game/engine.js';
-import { legalPlacements, smiteTargets, GOAL_CELLS, key, computeConnected } from '../src/game/board.js';
+import {
+  legalPlacements, smiteTargets, GOAL_CELLS, key, computeConnected, revealReachedGoals,
+} from '../src/game/board.js';
 import { buildDeck, PATH_TEMPLATES, ACTION_TEMPLATES } from '../src/game/cards.js';
 import { makeRng } from '../src/util/rng.js';
 import { chooseBotAction, gateBeliefs } from '../src/game/ai.js';
@@ -329,6 +331,80 @@ console.log('\ngate deduction');
   e.peeks[id] = { 0: false, 1: false };
   const deduced = gateBeliefs(e.viewFor(id));
   check('two known stones name the third Gate', deduced[2] === 'gold', JSON.stringify(deduced));
+}
+
+// --- building in the gaps between the Gates ---------------------------------
+// The three Gates sit in a column with one empty space between each pair.
+// Nothing in Saboteur forbids building into those gaps: the usual two rules
+// still decide it -- every touching edge must match, and the card must join a
+// tunnel that leads back to the start.
+console.log('\ngaps between the Gates');
+{
+  const cross = { n: true, e: true, s: true, w: true };
+  const span = (edges) => ({ kind: 'path', art: 'x', edges, passable: true });
+  const crossCard = { type: 'path', art: 'cross', edges: 'NESW', passable: true };
+
+  // Nothing laid yet: the gap at 8,-1 touches two Gates and nothing else.
+  {
+    const e = new Engine();
+    ['A', 'B', 'C'].forEach((n, i) => e.addPlayer('p' + i, n, i === 0));
+    e.startGame();
+    check('a gap between Gates is not reachable on its own',
+      !legalPlacements(e.state.tiles, crossCard).some((s2) => s2.x === 8 && s2.y === -1));
+  }
+
+  // Run the bridge out to column 7 and step up a row; now the gap is legal.
+  {
+    const e = new Engine();
+    ['A', 'B', 'C'].forEach((n, i) => e.addPlayer('p' + i, n, i === 0));
+    e.startGame();
+    for (let x = 1; x <= 7; x++) e.state.tiles[key(x, 0)] = span({ ...cross });
+    e.state.tiles[key(7, -1)] = span({ ...cross });
+
+    const spots = legalPlacements(e.state.tiles, crossCard);
+    check('the gap between two Gates can be built into',
+      spots.some((s2) => s2.x === 8 && s2.y === -1), JSON.stringify(spots.slice(0, 6)));
+
+    // A span laid in the gap opens both Gates it touches.
+    e.state.tiles[key(8, -1)] = span({ ...cross });
+    const opened = revealReachedGoals(e.state.tiles);
+    check('a span in the gap opens the Gates either side of it',
+      opened.includes(0) && opened.includes(1), JSON.stringify(opened));
+  }
+
+  // A revealed stone Gate is part of the bridge and can be built onward from.
+  {
+    const e = new Engine();
+    ['A', 'B', 'C'].forEach((n, i) => e.addPlayer('p' + i, n, i === 0));
+    e.startGame();
+    // Force the middle Gate to be stone so the round cannot end here.
+    GOAL_CELLS.forEach((c, i) => { e.state.tiles[key(c.x, c.y)].isGold = (i === 2); });
+    for (let x = 1; x <= 7; x++) e.state.tiles[key(x, 0)] = span({ ...cross });
+    revealReachedGoals(e.state.tiles);
+    const mid = e.state.tiles[key(8, 0)];
+    check('the middle Gate flipped to stone', mid.revealed && !mid.isGold);
+    check('a revealed Gate carries the bridge onward',
+      computeConnected(e.state.tiles).has('8,0'));
+    const onward = legalPlacements(e.state.tiles, crossCard);
+    check('you can build out of a revealed Gate into the next gap',
+      onward.some((s2) => s2.x === 8 && s2.y === 1), JSON.stringify(onward));
+  }
+
+  // Edges still have to match, Gate or no Gate.
+  {
+    const e = new Engine();
+    ['A', 'B', 'C'].forEach((n, i) => e.addPlayer('p' + i, n, i === 0));
+    e.startGame();
+    GOAL_CELLS.forEach((c, i) => { e.state.tiles[key(c.x, c.y)].isGold = (i === 2); });
+    for (let x = 1; x <= 7; x++) e.state.tiles[key(x, 0)] = span({ ...cross });
+    e.state.tiles[key(7, 1)] = span({ ...cross });
+    revealReachedGoals(e.state.tiles);
+    // A horizontal span at 8,1 would present a wall to the revealed Gate above.
+    const horiz = { type: 'path', art: 'horiz', edges: 'EW', passable: true };
+    const spots = legalPlacements(e.state.tiles, horiz);
+    check('a wall may not be turned against an open Gate',
+      !spots.some((s2) => s2.x === 8 && s2.y === 1), JSON.stringify(spots));
+  }
 }
 
 console.log('\n' + (failures ? failures + ' FAILURES' : 'all checks passed'));

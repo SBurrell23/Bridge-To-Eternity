@@ -1623,29 +1623,29 @@ export function makeCursor(kind, size = CURSOR_SIZE) {
   } else {
     // A pointer with a wing either side. The arrow sits mid-canvas so both
     // wings have room; the hotspot keeps the tip honest.
-    const wing = (dir) => {
+    // Wings sit at the tail of the arrow and spread sideways, so the point and
+    // most of the shaft stay clear and the pointer is still aimable.
+    const wing = (dir, sx, sy, k) => {
       ctx.save();
-      ctx.translate(...P(14.2, 9.4));
+      ctx.translate(...P(sx, sy));
       ctx.scale(dir, 1);
-      ctx.rotate(-0.22);
+      ctx.rotate(-0.1);
+      const Q = (x, y) => P(x * k, y * k);
       const path = () => {
         ctx.beginPath();
-        ctx.moveTo(...P(0, 0));
+        ctx.moveTo(...Q(0, 0));
         // leading edge sweeping up and out
-        ctx.bezierCurveTo(...P(3.4, -4.6), ...P(8.4, -5.8), ...P(11.2, -2.6));
+        ctx.bezierCurveTo(...Q(2.9, -3.9), ...Q(7.1, -4.9), ...Q(9.5, -2.2));
         // scalloped trailing edge coming back to the shoulder
-        ctx.quadraticCurveTo(...P(9.4, -1.4), ...P(8.4, 1.2));
-        ctx.quadraticCurveTo(...P(6.9, -0.7), ...P(5.4, 1.8));
-        ctx.quadraticCurveTo(...P(4.1, -0.4), ...P(2.7, 1.9));
-        ctx.quadraticCurveTo(...P(1.5, 0.3), ...P(0, 0));
+        ctx.quadraticCurveTo(...Q(8.0, -1.2), ...Q(7.1, 1.0));
+        ctx.quadraticCurveTo(...Q(5.9, -0.6), ...Q(4.6, 1.5));
+        ctx.quadraticCurveTo(...Q(3.5, -0.3), ...Q(2.3, 1.6));
+        ctx.quadraticCurveTo(...Q(1.3, 0.3), ...Q(0, 0));
         ctx.closePath();
       };
       outlined(path, '#fffdf4', '#6b4d13', 1.9);
       ctx.restore();
     };
-    wing(-1);
-    wing(1);
-
     outlined(() => {
       ctx.beginPath();
       ctx.moveTo(...P(14, 2.4));
@@ -1657,6 +1657,11 @@ export function makeCursor(kind, size = CURSOR_SIZE) {
       ctx.lineTo(...P(25.7, 12.6));
       ctx.closePath();
     }, goldGradient(ctx, ...P(14, 2), ...P(26, 20)), '#4a3410', 2.1);
+
+    // A close pair at the very tail, small enough to leave the point and most
+    // of the shaft showing.
+    wing(-1, 16.7, 18.3, 0.8);
+    wing(1, 18.2, 17.6, 0.8);
   }
 
   ctx.restore();
