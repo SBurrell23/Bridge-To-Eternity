@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS = {
   fallenCount: 0,       // 0 = automatic by player count
   noDeadEnds: false,
   revealRoles: true,    // show everyone's allegiance at round end
+  botSkill: 'steady',   // meek | steady | cunning
 };
 
 const MAX_LOG = 120;
@@ -53,7 +54,7 @@ export class Engine {
   }
 
   // -- players ------------------------------------------------------------
-  addPlayer(id, name, isHost = false) {
+  addPlayer(id, name, isHost = false, isBot = false) {
     const s = this.state;
     if (s.players[id]) {
       s.players[id].connected = true;
@@ -66,6 +67,7 @@ export class Engine {
       name: (name || 'Pilgrim').slice(0, 16),
       color,
       isHost,
+      isBot,
       connected: true,
       role: null,
       hand: [],
@@ -520,6 +522,7 @@ export class Engine {
           name: p.name,
           color: p.color,
           isHost: p.isHost,
+          isBot: !!p.isBot,
           connected: p.connected,
           handCount: p.hand.length,
           broken: p.broken,

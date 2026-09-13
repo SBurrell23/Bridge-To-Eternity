@@ -2,6 +2,7 @@
 // (host) or watching someone else's (client).
 
 import { Engine, DEFAULT_SETTINGS } from '../game/engine.js';
+import { chooseBotAction, pickBotName } from '../game/ai.js';
 import { NetHost, NetClient, randomCode } from './net.js';
 
 class Emitter {
@@ -31,6 +32,9 @@ export class HostSession extends Emitter {
     this.code = null;
     this.pending = new Map();     // peerId -> true until they say hello
     this.timer = null;
+    this.botSeq = 0;
+    this.botDeadline = 0;
+    this.botTurnKey = '';
 
     this.engine.onPrivate = (pid, msg) => this.sendPrivate(pid, msg);
     this.engine.onSfx = (sfx) => {
@@ -62,7 +66,9 @@ export class HostSession extends Emitter {
     this.net.on('warn', (err) => console.warn('[host]', err));
 
     this.timer = setInterval(() => {
-      if (this.engine.tick()) this.broadcast();
+      let changed = this.engine.tick();
+      if (this.runAcolyte()) changed = true;
+      if (changed) this.broadcast();
     }, 300);
 
     this.broadcast();
@@ -154,6 +160,66 @@ export class HostSession extends Emitter {
     }
   }
 
+  // -- acolytes (computer players) ----------------------------------------
+  addBot() {
+    if (this.engine.state.phase !== 'lobby') return { error: 'The game has already begun.' };
+    if (this.engine.playerCount >= 10) return { error: 'The cloud is full.' };
+    this.botSeq += 1;
+    const taken = Object.values(this.engine.state.players).map((p) => p.name);
+    const name = pickBotName(taken);
+    this.engine.addPlayer('bot_' + this.botSeq, name, false, true);
+    this.pushChat(null, name + ' descends to help. Or to hinder.', 'system');
+    this.broadcast();
+    return { ok: true };
+  }
+
+  removeBot(id) {
+    const p = this.engine.state.players[id];
+    if (!p || !p.isBot) return;
+    this.engine.removePlayer(id);
+    this.broadcast();
+  }
+
+  /**
+   * Give the acolyte whose turn it is a moment to "think", then let it move.
+   * It decides from its own player view only -- the same information a human
+   * in that seat would have.
+   */
+  runAcolyte() {
+    const s = this.engine.state;
+    if (s.phase !== 'playing') { this.botDeadline = 0; return false; }
+    const id = this.engine.currentPlayerId();
+    const p = s.players[id];
+    if (!p || !p.isBot || !p.hand.length) { this.botDeadline = 0; return false; }
+
+    const turnKey = s.round + ':' + s.turnIndex;
+    if (this.botTurnKey !== turnKey) {
+      this.botTurnKey = turnKey;
+      this.botDeadline = Date.now() + 800 + Math.random() * 1500;
+      return false;
+    }
+    if (Date.now() < this.botDeadline) return false;
+    this.botDeadline = Infinity;   // don't fire twice for one turn
+
+    let action = null;
+    try {
+      action = chooseBotAction(
+        this.engine.viewFor(id),
+        (cardId) => this.engine.placementsFor(id, cardId),
+        { skill: this.engine.settings.botSkill },
+      );
+    } catch (err) {
+      console.error('[acolyte]', err);
+    }
+
+    let res = action ? this.engine.handle(id, action) : { error: 'no move' };
+    if (res && res.error) {
+      // An acolyte must never stall the table: fall back to casting a card away.
+      res = this.engine.handle(id, { t: 'discard', cardId: p.hand[0].id });
+    }
+    return true;
+  }
+
   // -- commands from the local UI ----------------------------------------
   intent(action) {
     const res = this.engine.handle(this.localId, action);
@@ -193,6 +259,8 @@ export class HostSession extends Emitter {
 
   kick(playerId) {
     if (playerId === this.localId) return;
+    const p = this.engine.state.players[playerId];
+    if (p && p.isBot) { this.removeBot(playerId); return; }
     this.net.send(playerId, { t: 'denied', reason: 'The host has removed you from the room.' });
     setTimeout(() => this.net.kick(playerId), 300);
     this.engine.removePlayer(playerId);
@@ -253,6 +321,8 @@ export class ClientSession extends Emitter {
   setSettings() { /* host only */ }
   startGame() { /* host only */ }
   nextRound() { this.net.send({ t: 'intent', action: { t: 'next' } }); }
+  addBot() { /* host only */ }
+  removeBot() { /* host only */ }
   backToLobby() { /* host only */ }
   kick() { /* host only */ }
   leave() { this.net.destroy(); }

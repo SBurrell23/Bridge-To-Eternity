@@ -99,7 +99,7 @@ export class Hud {
       line.textContent = 'Your move';
       line.style.color = '#fff4cf';
     } else if (cur) {
-      line.textContent = cur.name + ' is thinking…';
+      line.textContent = cur.name + (cur.isBot ? ' is deliberating…' : ' is thinking…');
       line.style.color = cur.color;
     }
 
@@ -154,6 +154,8 @@ export class Hud {
       if (p.id === v.currentPlayerId) classes.push('current');
       if (v.you && p.id === v.you.id) classes.push('me');
       if (!p.connected) classes.push('offline');
+      if (p.isBot) classes.push('bot');
+      if (p.isBot && p.id === v.currentPlayerId) classes.push('thinking');
       if (targetable.has(p.id)) classes.push('targetable');
 
       const tools = el('div', { class: 'tools' }, TOOLS.map((t) => el('img', {
@@ -424,6 +426,10 @@ export function openHelp() {
     <p>Two crews stand on a cloud. The <strong>Builders</strong> want to lay a bridge east to the
     Gate of Gold. The <strong>Fallen</strong> are mixed in among them, smiling, helping — and making
     quite sure the bridge never arrives. Nobody knows who is who.</p>
+
+    <p class="muted">Short of players? The host can summon <strong>Acolytes</strong> in the lobby.
+    They are dealt allegiances like anyone else, they only see what you see, and the friendly one
+    beside you may well be Fallen.</p>
 
     <div class="rules-cols">
       <div>

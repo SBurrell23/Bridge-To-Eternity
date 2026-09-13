@@ -4,6 +4,7 @@ import { Engine } from '../src/game/engine.js';
 import { legalPlacements, smiteTargets, GOAL_CELLS, key, computeConnected } from '../src/game/board.js';
 import { buildDeck, PATH_TEMPLATES, ACTION_TEMPLATES } from '../src/game/cards.js';
 import { makeRng } from '../src/util/rng.js';
+import { chooseBotAction, gateBeliefs } from '../src/game/ai.js';
 
 let failures = 0;
 function check(name, cond, detail) {
@@ -224,6 +225,110 @@ console.log('\nillegal intents');
     check('cursed player cannot lay a span',
       !!e.handle(cur, { t: 'playPath', cardId: path.id, x: 1, y: 0, rotated: false }).error);
   }
+}
+
+// --- acolytes (the AI) ------------------------------------------------------
+console.log('\nacolytes');
+{
+  const rng = makeRng(99);
+  let builderRounds = 0;
+  let fallenRounds = 0;
+  let errors = 0;
+  let stalls = 0;
+  let deadEndsByBuilders = 0;
+  let buildersSpans = 0;
+  const GAMES = 60;
+
+  for (let g = 0; g < GAMES; g++) {
+    const skill = ['meek', 'steady', 'cunning'][g % 3];
+    const e = new Engine({ rounds: 1, botSkill: skill });
+    const n = 3 + Math.floor(rng() * 6);
+    for (let i = 0; i < n; i++) e.addPlayer('b' + i, 'Bot' + i, i === 0, true);
+    e.startGame();
+
+    let guard = 0;
+    while (e.state.phase === 'playing' && guard++ < 3000) {
+      const id = e.currentPlayerId();
+      // An acolyte sees only what a human in that seat would see.
+      const view = e.viewFor(id);
+      if (view.players.some((p) => p.role !== null)) { errors++; break; }
+      if (Object.values(view.tiles).some((t) => t.kind === 'goal' && !t.revealed && 'isGold' in t)) {
+        errors++; break;
+      }
+      let action = null;
+      try {
+        action = chooseBotAction(view, (cardId) => e.placementsFor(id, cardId), { skill, rng });
+      } catch (err) {
+        errors++;
+        console.log('    threw: ' + err.message);
+        break;
+      }
+      if (!action) { errors++; break; }
+      if (action.t === 'playPath' && view.you.role === 'builder') {
+        const card = view.you.hand.find((c) => c.id === action.cardId);
+        buildersSpans++;
+        if (card && !card.passable) deadEndsByBuilders++;
+      }
+      const res = e.handle(id, action);
+      if (res && res.error) errors++;
+    }
+    if (e.state.phase === 'playing') stalls++;
+    else if (e.state.roundResult.winner === 'builders') builderRounds++;
+    else fallenRounds++;
+  }
+
+  check('acolytes never produced an illegal move', errors === 0, errors + ' errors');
+  check('no acolyte stalled the table', stalls === 0, stalls + ' stalls');
+  check('acolyte Builders win sometimes', builderRounds > 0, String(builderRounds));
+  check('acolyte Fallen win sometimes', fallenRounds > 0, String(fallenRounds));
+  check('acolyte Builders rarely lay broken spans',
+    deadEndsByBuilders / Math.max(1, buildersSpans) < 0.06,
+    deadEndsByBuilders + '/' + buildersSpans);
+  console.log('  info builders ' + builderRounds + ' / fallen ' + fallenRounds + ' over ' + GAMES + ' rounds');
+}
+
+// --- acolytes sharing a table with scripted players -------------------------
+console.log('\nacolytes vs scripted players');
+{
+  const rng = makeRng(4242);
+  let errors = 0;
+  let builderRounds = 0;
+  let fallenRounds = 0;
+  for (let g = 0; g < 40; g++) {
+    const e = new Engine({ rounds: 1 });
+    const n = 4 + Math.floor(rng() * 4);
+    for (let i = 0; i < n; i++) e.addPlayer('p' + i, 'P' + i, i === 0, i % 2 === 1);
+    e.startGame();
+    let guard = 0;
+    while (e.state.phase === 'playing' && guard++ < 3000) {
+      const id = e.currentPlayerId();
+      const res = e.state.players[id].isBot
+        ? e.handle(id, chooseBotAction(e.viewFor(id), (cid) => e.placementsFor(id, cid), { rng }))
+        : botTurn(e, rng);
+      if (res && res.error) errors++;
+    }
+    if (e.state.phase === 'playing') errors++;
+    else if (e.state.roundResult.winner === 'builders') builderRounds++;
+    else fallenRounds++;
+  }
+  check('mixed tables play cleanly', errors === 0, errors + ' errors');
+  check('mixed tables reach both outcomes', builderRounds > 0 && fallenRounds > 0,
+    builderRounds + ' / ' + fallenRounds);
+}
+
+// --- what an acolyte is allowed to deduce -----------------------------------
+console.log('\ngate deduction');
+{
+  const e = new Engine();
+  ['A', 'B', 'C'].forEach((n, i) => e.addPlayer('p' + i, n, i === 0));
+  e.startGame();
+  const id = e.state.order[0];
+  const blind = gateBeliefs(e.viewFor(id));
+  check('an unlooked Gate stays unknown', blind.every((b) => b === 'unknown'), JSON.stringify(blind));
+
+  e.peeks[id] = { 0: false, 1: false };
+  const deduced = gateBeliefs(e.viewFor(id));
+  check('two known stones name the third Gate', deduced[2] === 'gold', JSON.stringify(deduced));
 }
 
 console.log('\n' + (failures ? failures + ' FAILURES' : 'all checks passed'));

@@ -50,6 +50,14 @@ const LOBBY_OPTIONS = [
     options: [[0, 'Automatic'], [1, '1'], [2, '2'], [3, '3'], [4, '4']],
   },
   {
+    key: 'botSkill',
+    label: 'Acolyte skill',
+    hint: 'How sharply the computer-controlled pilgrims play — and how convincingly they lie.',
+    type: 'select',
+    parse: String,
+    options: [['meek', 'Meek'], ['steady', 'Steady'], ['cunning', 'Cunning']],
+  },
+  {
     key: 'noDeadEnds',
     label: 'Remove broken spans',
     hint: 'A gentler deck: every bridge card can be crossed.',
@@ -180,9 +188,10 @@ export class Menu {
     const list = clear($('#lobby-list'));
     const isHost = view.you && view.you.isHost;
     for (const p of view.players) {
-      list.appendChild(el('li', {}, [
+      list.appendChild(el('li', { class: p.isBot ? 'is-bot' : '' }, [
         el('span', { class: 'dot', style: { background: p.color, color: p.color } }),
         el('span', { class: 'pname', text: p.name }),
+        p.isBot ? el('span', { class: 'tag bot-tag', text: 'Acolyte' }) : null,
         p.isHost ? el('span', { class: 'tag', text: 'Host' }) : null,
         view.you && p.id === view.you.id ? el('span', { class: 'tag', text: 'You' }) : null,
         isHost && (!view.you || p.id !== view.you.id)
@@ -191,6 +200,24 @@ export class Menu {
       ]));
     }
     $('#lobby-count').textContent = '(' + view.players.length + ')';
+
+    const addWrap = clear($('#lobby-add-bot'));
+    if (isHost) {
+      const full = view.players.length >= 10;
+      addWrap.appendChild(el('button', {
+        class: 'ghost-btn add-bot-btn',
+        disabled: full,
+        title: full ? 'The cloud is full.' : 'Summon a computer-controlled pilgrim',
+        onclick: () => this.h.onAddBot(),
+      }, ['+ Summon an Acolyte']));
+      const bots = view.players.filter((p) => p.isBot).length;
+      if (bots) {
+        addWrap.appendChild(el('span', {
+          class: 'hint',
+          text: bots + (bots === 1 ? ' acolyte' : ' acolytes') + ' will play alongside you.',
+        }));
+      }
+    }
 
     this.renderOptions(view, isHost);
 
@@ -225,9 +252,10 @@ export class Menu {
       const value = view.settings[opt.key];
       let control;
       if (opt.type === 'select') {
+        const parse = opt.parse || Number;
         control = el('select', {
           disabled: !isHost,
-          onchange: (e) => this.h.onSetting(opt.key, Number(e.target.value)),
+          onchange: (e) => this.h.onSetting(opt.key, parse(e.target.value)),
         }, opt.options.map(([v, label]) => el('option', {
           value: v, text: label, selected: String(v) === String(value),
         })));

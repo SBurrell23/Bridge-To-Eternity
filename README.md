@@ -29,9 +29,30 @@ synthesised at runtime:
 - **Sound** — every chime, crack, curse and fanfare is Web Audio: oscillators, filtered noise and a
   convolution reverb built from a generated impulse response (`src/audio/audio.js`).
 
+## Playing against the computer
+
+You do not need five friends to hand. In the lobby the host can **Summon an Acolyte** — a
+computer-controlled pilgrim — as many as there is room for, so one person plus two acolytes is a
+complete game.
+
+Acolytes are dealt allegiances like anybody else, so the one sitting next to you may well be
+Fallen, and it will act like it: laying a helpful span now and then for cover, mending your Halo
+with one hand and dropping a severed span on the frontier with the other. A Builder acolyte watches
+who lays broken spans and who reaches for the Smite, and curses the pilgrim it trusts least.
+
+Crucially, an acolyte is handed exactly the view a human in that seat would get — its own hand, its
+own allegiance, its own Revelations and the public board. It cannot see your cards, it does not know
+your role, and it has no idea which Gate hides the gold until it looks. Everything it does is
+inference (`src/game/ai.js`).
+
+Three skill levels in the lobby: **Meek** blunders often and bluffs clumsily, **Steady** plays a
+solid game, and **Cunning** rarely wastes a turn and lies well. Across a few hundred headless games
+the three settle at roughly an even split between the two sides.
+
 ## How a game works
 
-Three to ten players. One player opens a room and shares the four-letter code; everyone else joins.
+Three to ten pilgrims, humans and acolytes in any mix. One player opens a room and shares the
+four-letter code; everyone else joins.
 The host's browser runs the authoritative game engine and sends every other player a view tailored
 to them — a view that never contains another player's hand, anyone's allegiance, or what lies
 behind an unopened Gate.
@@ -84,8 +105,9 @@ nobody can deduce the split.
 
 ## Settings
 
-**In the lobby** (host only): number of rounds, turn timer, hand size, how many Fallen, whether to
-remove broken spans from the deck, and whether allegiances are revealed at the end of a round.
+**In the lobby** (host only): number of rounds, turn timer, hand size, how many Fallen, acolyte
+skill, whether to remove broken spans from the deck, and whether allegiances are revealed at the end
+of a round — plus summoning and dismissing acolytes.
 
 **Per player** (kept in `localStorage`): master / effects / music volume and mute; quality preset;
 frame-rate cap; anti-aliasing; resolution scale; shadows; cloud density; shafts of light; drifting
@@ -102,10 +124,16 @@ npx --yes http-server . -p 4173 -c-1
 Then open `http://localhost:4173`. To test multiplayer, open the page in several tabs: host in one,
 join from the others with the room code.
 
-Run the rules simulation (200 full games, headless):
+Run the rules simulation (200 full games plus 100 acolyte games, headless):
 
 ```bash
 node tests/sim.mjs
+```
+
+Probe how the two sides are balancing at each acolyte skill level:
+
+```bash
+node tests/balance.mjs
 ```
 
 ## How it fits together
@@ -119,6 +147,7 @@ src/
     cards.js          the deck: every card, role table, hand sizes, payouts
     board.js          grid, placement legality, bridge connectivity, Gate reveals
     engine.js         authoritative state machine; builds per-player views
+    ai.js             the acolytes; decides from a player view, never from engine state
   net/
     net.js            PeerJS transport (host and client)
     session.js        one interface for the UI whether hosting or joining
@@ -130,7 +159,8 @@ src/
     camera.js         free-roaming board camera
   audio/audio.js      Web Audio synthesis and the ambient score
   ui/                 HUD, lobby, settings, modals
-tests/sim.mjs         headless rules harness
+tests/sim.mjs         headless rules + acolyte harness
+tests/balance.mjs     acolyte win-rate probe (not part of the deploy gate)
 ```
 
 The engine is pure and has no idea a browser exists, which is why the same file can be driven by
