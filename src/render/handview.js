@@ -75,7 +75,7 @@ export class HandView {
 
   get metrics() {
     const n = Math.max(1, this.cards.length);
-    const cw = Math.max(78, Math.min(this.width * 0.105, this.height * 0.2, 162));
+    const cw = Math.max(88, Math.min(this.width * 0.115, this.height * 0.2, 174));
     const ch = cw * 1.5;
     const spacing = Math.min(cw * 0.94, (this.width * 0.78) / n);
     return { cw, ch, spacing, n };
@@ -86,7 +86,7 @@ export class HandView {
    * selected, so the action bar never lands on top of one.
    */
   get stripHeight() {
-    return this.metrics.ch + 118;
+    return this.metrics.ch + 112;
   }
 
   setCards(cards) {
@@ -191,7 +191,7 @@ export class HandView {
 
   update(dt) {
     this.time += dt;
-    const lerp = 1 - Math.pow(0.0009, dt);
+    const lerp = 1 - Math.pow(1e-8, dt);
 
     for (let i = this.cards.length - 1; i >= 0; i--) {
       const e = this.cards[i];
@@ -214,7 +214,7 @@ export class HandView {
         const hovered = this.hoverId === e.card.id;
         const selected = this.selectedId === e.card.id;
         const stowed = this.aiming && !selected;
-        const lift = selected ? 66 : stowed ? -(e.ch || 180) * 0.62 : hovered ? 54 : 0;
+        const lift = selected ? 52 : stowed ? -(e.ch || 180) * 0.62 : hovered ? 42 : 0;
         // Hovering blows the card up properly so its rules text can be read.
         const scale = selected ? 1.24 : hovered && !stowed ? 1.42 : 1;
         const tx = e.target.x;
