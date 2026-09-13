@@ -6,17 +6,19 @@ import { makeCardFaceTexture, makeCardBackTexture, makeGlowTexture } from './car
 
 const texCache = new Map();
 
-export function cardSignature(card) {
-  if (card.type === 'path') return 'p:' + card.art + ':' + card.edges + ':' + (card.passable ? 1 : 0);
+export function cardSignature(card, rotated = false) {
+  if (card.type === 'path') {
+    return 'p:' + card.art + ':' + card.edges + ':' + (card.passable ? 1 : 0) + (rotated ? ':r' : '');
+  }
   if (card.action === 'break') return 'b:' + card.tool;
   if (card.action === 'repair') return 'r:' + card.tools.join('-');
   return 'a:' + card.action;
 }
 
-export function cardTexture(card) {
-  const sig = cardSignature(card);
+export function cardTexture(card, rotated = false) {
+  const sig = cardSignature(card, rotated);
   if (texCache.has(sig)) return texCache.get(sig);
-  const t = new THREE.CanvasTexture(makeCardFaceTexture(card));
+  const t = new THREE.CanvasTexture(makeCardFaceTexture(card, rotated));
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   texCache.set(sig, t);
@@ -57,6 +59,8 @@ export class HandView {
     // While a card is being aimed the rest of the hand slides down out of the
     // way, so the near end of the bridge stays clickable.
     this.aiming = false;
+    // Which way the selected span is facing, so its face can be redrawn.
+    this.rotated = false;
     this.time = 0;
     this.raycaster = new THREE.Raycaster();
     this.pointer = new THREE.Vector2(-10, -10);
@@ -160,7 +164,26 @@ export class HandView {
   }
 
   setSelected(id) {
+    if (id !== this.selectedId) this.rotated = false;
     this.selectedId = id;
+    this.syncSelectedFace();
+  }
+
+  /** Flip the selected card's face so it matches the ghost on the board. */
+  setRotation(rotated) {
+    this.rotated = !!rotated;
+    this.syncSelectedFace();
+  }
+
+  syncSelectedFace() {
+    for (const e of this.cards) {
+      if (e.leaving || e.card.type !== 'path') continue;
+      const want = cardTexture(e.card, e.card.id === this.selectedId && this.rotated);
+      if (e.mesh.material.map !== want) {
+        e.mesh.material.map = want;
+        e.mesh.material.needsUpdate = true;
+      }
+    }
   }
 
   /** Returns the card id under the pointer, or null. */

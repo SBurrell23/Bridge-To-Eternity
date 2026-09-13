@@ -37,6 +37,71 @@ function tileTexture(tile) {
   return t;
 }
 
+const PORTAL_VERT = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+// Value noise stacked into a slow upward drift, then sheared by a travelling
+// sine so the surface curls instead of merely scrolling.
+const PORTAL_FRAG = `
+  uniform float uTime;
+  uniform vec3 uDeep;
+  uniform vec3 uBright;
+  uniform float uAlpha;
+  varying vec2 vUv;
+
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+  }
+  float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
+               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+  }
+
+  void main() {
+    vec2 uv = vUv;
+    float t = uTime;
+    float n = noise(uv * 3.0 + vec2(0.0, -t * 0.28)) * 0.55
+            + noise(uv * 6.5 + vec2(t * 0.18, -t * 0.52)) * 0.3
+            + noise(uv * 13.0 - vec2(t * 0.12, t * 0.8)) * 0.15;
+    float curl = sin((uv.y * 7.0 - t * 1.1) + n * 5.5) * 0.5 + 0.5;
+    float body = clamp(n * 0.85 + curl * 0.45, 0.0, 1.0);
+    float core = smoothstep(0.35, 0.95, body);
+    vec3 col = mix(uDeep, uBright, core);
+    col += pow(core, 3.0) * 0.35;
+
+    // Melt into the stonework rather than ending on a hard rim.
+    float edge = smoothstep(0.0, 0.16, uv.x) * smoothstep(1.0, 0.84, uv.x)
+               * smoothstep(0.0, 0.1, uv.y) * smoothstep(1.0, 0.9, uv.y);
+    gl_FragColor = vec4(col, uAlpha * edge * (0.45 + 0.55 * body));
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+  }
+`;
+
+/** ShapeGeometry hands back position-space uvs; renormalise them to 0..1. */
+function normaliseUv(geo) {
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  const w = bb.max.x - bb.min.x || 1;
+  const h = bb.max.y - bb.min.y || 1;
+  const pos = geo.attributes.position;
+  const uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    uv[i * 2] = (pos.getX(i) - bb.min.x) / w;
+    uv[i * 2 + 1] = (pos.getY(i) - bb.min.y) / h;
+  }
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return geo;
+}
+
 function edgeMaterial() {
   return new THREE.MeshStandardMaterial({
     color: 0xf2d489, roughness: 0.34, metalness: 0.8,
@@ -70,6 +135,7 @@ export class BoardView {
     this.markers = new THREE.Group();
     this.root.add(this.markers);
     this.ghost = null;
+    this.portals = [];
     this.time = 0;
     this.playerColors = {};
 
@@ -159,12 +225,16 @@ export class BoardView {
 
   makeGateArch(tile) {
     const g = new THREE.Group();
+    // High metalness with no environment map renders almost black, which is
+    // what made the gates read as bronze. Less metal plus a warm emissive puts
+    // the gold back.
+    const stone = tile.revealed && !tile.isGold;
     const gold = new THREE.MeshStandardMaterial({
-      color: tile.revealed && !tile.isGold ? 0x8d97a6 : 0xf0d08c,
-      roughness: 0.34,
-      metalness: 0.85,
-      emissive: tile.revealed && tile.isGold ? 0x6b4f14 : 0x1a1a1a,
-      emissiveIntensity: tile.revealed && tile.isGold ? 0.8 : 0.2,
+      color: stone ? 0x97a2b2 : 0xffdf95,
+      roughness: stone ? 0.62 : 0.26,
+      metalness: stone ? 0.1 : 0.5,
+      emissive: stone ? 0x14181e : 0x7c5c16,
+      emissiveIntensity: stone ? 0.15 : (tile.isGold ? 0.75 : 0.5),
     });
     const pillarGeo = new THREE.CylinderGeometry(0.17, 0.22, 2.1, 12);
     [-0.78, 0.78].forEach((z) => {
@@ -193,18 +263,32 @@ export class BoardView {
     shape.lineTo(half, 0);
     shape.closePath();
 
-    const portalMat = new THREE.MeshBasicMaterial({
-      color: tile.revealed ? (tile.isGold ? 0xfff2c4 : 0x5a6474) : 0x2b2445,
+    const scheme = tile.revealed
+      ? (tile.isGold
+        ? { deep: 0xb8791a, bright: 0xfff6cf, alpha: 0.95 }
+        : { deep: 0x2c3542, bright: 0x93a3b8, alpha: 0.72 })
+      : { deep: 0x241a44, bright: 0x9d7cf0, alpha: 0.85 };
+
+    const portalMat = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: Math.random() * 40 },
+        uDeep: { value: new THREE.Color(scheme.deep) },
+        uBright: { value: new THREE.Color(scheme.bright) },
+        uAlpha: { value: scheme.alpha },
+      },
+      vertexShader: PORTAL_VERT,
+      fragmentShader: PORTAL_FRAG,
       transparent: true,
-      opacity: tile.revealed ? (tile.isGold ? 0.92 : 0.6) : 0.75,
-      side: THREE.DoubleSide,
       depthWrite: false,
+      side: THREE.DoubleSide,
+      fog: false,
     });
-    const portal = new THREE.Mesh(new THREE.ShapeGeometry(shape, 24), portalMat);
+    const portal = new THREE.Mesh(normaliseUv(new THREE.ShapeGeometry(shape, 36)), portalMat);
     portal.position.set(0, SLAB_H / 2, 0);
     portal.rotation.y = Math.PI / 2;
     g.add(portal);
     g.userData.portal = portal;
+    this.portals.push(portalMat);
 
     if (tile.revealed && tile.isGold) {
       const glow = glowSprite('255,238,180', 10, 0.7);
@@ -277,6 +361,9 @@ export class BoardView {
 
   disposeGroup(group) {
     group.traverse((o) => {
+      if (o.material && o.material.isShaderMaterial) {
+        this.portals = this.portals.filter((m) => m !== o.material);
+      }
       if (o.geometry) o.geometry.dispose();
       if (o.material) {
         const mats = Array.isArray(o.material) ? o.material : [o.material];
@@ -436,12 +523,9 @@ export class BoardView {
         g.position.y = BOARD_Y + (rec.connected ? Math.sin(t * 0.9 + g.position.x * 0.4) * 0.035 : 0);
       }
       if (g.userData.gem) g.userData.gem.rotation.y += dt * 1.6;
-      const gate = g.children.find((c) => c.userData && c.userData.portal);
-      if (gate) {
-        const p = gate.userData.portal;
-        p.material.opacity = 0.55 + 0.22 * Math.sin(t * 1.2 + g.position.z);
-      }
     }
+
+    for (const m of this.portals) m.uniforms.uTime.value += dt;
 
     for (let i = this.falling.length - 1; i >= 0; i--) {
       const f = this.falling[i];

@@ -88,7 +88,8 @@ h1, h2, h3, .display, button, kbd, .code-row strong {
 button {
   font-size: 0.92rem;
   letter-spacing: 0.04em;
-  cursor: pointer;
+  /* Inherit so the game's own winged / pitchfork cursor survives over the UI. */
+  cursor: inherit;
   color: var(--ink);
   background: linear-gradient(180deg, rgba(56, 82, 122, 0.6), rgba(20, 36, 61, 0.75));
   border: 1px solid var(--edge);
@@ -102,7 +103,7 @@ button:hover:not(:disabled) {
   transform: translateY(-1px);
 }
 button:active:not(:disabled) { transform: translateY(0); }
-button:disabled { opacity: 0.42; cursor: not-allowed; }
+button:disabled { opacity: 0.42; }
 
 .big-btn {
   font-size: 1.05rem;
@@ -342,17 +343,17 @@ kbd {
   position: absolute;
   top: 14px;
   left: 14px;
-  width: 268px;
-  padding: 12px 13px 10px;
+  width: 330px;
+  padding: 15px 16px 12px;
   display: grid;
-  gap: 9px;
+  gap: 11px;
 }
 .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
-.round-line { font-size: 0.72rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-dim); }
-.turn-line { font-family: 'Cinzel', serif; font-size: 1.02rem; color: var(--gold-1); margin-top: 2px; line-height: 1.2; }
+.round-line { font-size: 0.76rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--ink-dim); }
+.turn-line { font-family: 'Cinzel', serif; font-size: 1.14rem; color: var(--gold-1); margin-top: 3px; line-height: 1.2; }
 .reach {
   font-family: 'Cinzel', serif;
-  font-size: 1.35rem;
+  font-size: 1.6rem;
   color: var(--gold-2);
   line-height: 1;
   text-align: right;
@@ -368,11 +369,11 @@ kbd {
   display: grid;
   grid-template-columns: auto 1fr auto;
   align-items: center;
-  gap: 8px;
-  padding: 5px 7px;
-  border-radius: 8px;
+  gap: 9px;
+  padding: 7px 9px;
+  border-radius: 9px;
   border: 1px solid transparent;
-  font-size: 0.9rem;
+  font-size: 1rem;
   transition: background 0.2s, border-color 0.2s;
 }
 #player-list li.current {
@@ -383,18 +384,34 @@ kbd {
 #player-list li.offline { opacity: 0.42; }
 #player-list li.targetable { cursor: pointer; border-color: rgba(255, 122, 77, 0.6); background: rgba(255, 122, 77, 0.12); }
 #player-list li.targetable:hover { background: rgba(255, 122, 77, 0.25); }
-.p-right { display: flex; align-items: center; gap: 6px; }
-.tools { display: flex; gap: 2px; }
-.tool-icon { width: 17px; height: 17px; opacity: 0.28; }
-.tool-icon.broken { opacity: 1; filter: drop-shadow(0 0 5px rgba(212, 64, 74, 0.8)); }
+.p-right { display: flex; align-items: center; gap: 8px; }
+.tools { display: flex; gap: 3px; }
+.tool-icon {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 244, 207, 0.18);
+  background: rgba(255, 244, 207, 0.07);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.tool-icon img { width: 20px; height: 20px; opacity: 0.85; display: block; }
+.tool-icon:hover { transform: translateY(-1px); border-color: rgba(255, 244, 207, 0.55); }
+.tool-icon.broken {
+  border-color: rgba(212, 64, 74, 0.85);
+  background: rgba(212, 64, 74, 0.24);
+  box-shadow: 0 0 12px rgba(212, 64, 74, 0.55);
+}
+.tool-icon.broken img { opacity: 1; filter: drop-shadow(0 0 4px rgba(255, 120, 110, 0.9)); }
 .grace {
   font-family: 'Cinzel', serif;
-  font-size: 0.82rem;
+  font-size: 0.95rem;
   color: var(--gold-2);
   min-width: 1.6em;
   text-align: right;
 }
-.hand-count { font-size: 0.72rem; color: var(--ink-dim); }
+.hand-count { font-size: 0.82rem; color: var(--ink-dim); }
 #player-list li.bot .pname::after {
   content: 'AI';
   font-family: 'Cinzel', serif;
@@ -415,14 +432,15 @@ kbd {
   justify-content: space-between;
   align-items: center;
   border-top: 1px solid var(--edge-soft);
-  padding-top: 7px;
-  font-size: 0.76rem;
+  padding-top: 9px;
+  font-size: 0.84rem;
   color: var(--ink-dim);
   letter-spacing: 0.08em;
 }
+
 .role-chip {
   font-family: 'Cinzel', serif;
-  font-size: 0.74rem;
+  font-size: 0.82rem;
   letter-spacing: 0.14em;
   padding: 0.2em 0.7em;
   border-radius: 20px;
@@ -480,16 +498,19 @@ kbd {
 .log-line.reveal { color: #ccb6ff; }
 .log-line.round { color: var(--gold-2); border-top: 1px solid var(--edge-soft); padding-top: 5px; margin-top: 5px; }
 
+/* Out of the way of the board: the prompt and its buttons live along the top,
+   between the turn panel and the toolbar. */
 .action-bar {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(var(--hand-h, 210px) + 6px);
+  top: 14px;
   display: grid;
-  gap: 7px;
+  gap: 8px;
   justify-items: center;
-  max-width: min(620px, 92vw);
+  max-width: min(620px, calc(100vw - 720px));
   text-align: center;
+  z-index: 3;
 }
 .prompt {
   background: var(--glass-2);
@@ -525,7 +546,7 @@ kbd {
 
 #toasts {
   position: absolute;
-  top: 74px;
+  top: 132px;
   left: 50%;
   transform: translateX(-50%);
   display: grid;
@@ -705,10 +726,21 @@ kbd {
   .join-row .big-btn { flex: 1 1 100%; }
 }
 
+@media (max-width: 1100px) {
+  /* Not enough room across the top for the prompt to sit between the panels. */
+  .action-bar {
+    top: auto;
+    bottom: calc(var(--hand-h, 210px) + 6px);
+    max-width: min(620px, 92vw);
+  }
+  #toasts { top: 74px; }
+}
+
 @media (max-width: 640px) {
   #turn-panel { width: calc(100vw - 28px); }
   #log-panel { width: calc(100vw - 28px); max-height: 20vh; bottom: calc(var(--hand-h, 180px) + 56px); }
   .action-bar { bottom: calc(var(--hand-h, 180px) + 4px); }
+  .help-cards > div { grid-template-columns: 1fr; gap: 2px; }
   .code-box { text-align: left; }
   .lobby-head { flex-direction: column; align-items: stretch; }
 }
@@ -719,3 +751,101 @@ kbd {
   box-shadow: 0 0 18px rgba(240, 205, 125, 0.4);
   color: var(--gold-1);
 }
+
+
+/* ---------------- tooltips ---------------- */
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  max-width: 260px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: linear-gradient(170deg, rgba(28, 46, 76, 0.97), rgba(10, 19, 34, 0.98));
+  border: 1px solid var(--edge);
+  box-shadow: var(--shadow);
+  pointer-events: none;
+  display: grid;
+  gap: 3px;
+  animation: tip-in 0.13s ease both;
+}
+.tooltip strong {
+  font-family: 'Cinzel', serif;
+  font-size: 0.76rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--gold-2);
+}
+.tooltip span { font-size: 0.88rem; line-height: 1.4; color: var(--ink); }
+.tooltip::after {
+  content: '';
+  position: absolute;
+  left: var(--tip-arrow, 50%);
+  top: -5px;
+  width: 9px;
+  height: 9px;
+  margin-left: -5px;
+  background: rgba(28, 46, 76, 0.97);
+  border-left: 1px solid var(--edge);
+  border-top: 1px solid var(--edge);
+  transform: rotate(45deg);
+}
+.tooltip.above::after {
+  top: auto;
+  bottom: -5px;
+  border-left: none;
+  border-top: none;
+  border-right: 1px solid var(--edge);
+  border-bottom: 1px solid var(--edge);
+  background: rgba(10, 19, 34, 0.98);
+}
+@keyframes tip-in { from { opacity: 0; transform: translateY(-3px); } }
+
+/* ---------------- how to play ---------------- */
+.help-tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.help-tab {
+  background: rgba(10, 20, 36, 0.6);
+  border: 1px solid var(--edge-soft);
+  border-radius: 999px;
+  padding: 0.42em 1.15em;
+  font-size: 0.82rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.help-tab.active {
+  color: #2a1d05;
+  background: linear-gradient(180deg, var(--gold-1), var(--gold-2) 55%, var(--gold-3));
+  border-color: rgba(255, 248, 226, 0.8);
+}
+.help-pane { min-height: 268px; font-size: 1rem; line-height: 1.62; }
+.help-pane .lead { font-size: 1.06rem; margin: 0 0 4px; }
+.help-pane h4 {
+  font-family: 'Cinzel', serif;
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--gold-2);
+  margin: 20px 0 6px;
+}
+.help-pane ul.spaced { margin: 0; padding-left: 20px; }
+.help-pane ul.spaced li { margin-bottom: 9px; }
+.help-pane b { color: var(--gold-1); font-weight: 600; }
+.help-cards { display: grid; gap: 11px; }
+.help-cards > div {
+  display: grid;
+  grid-template-columns: 8.5em 1fr;
+  gap: 14px;
+  align-items: baseline;
+  padding-bottom: 9px;
+  border-bottom: 1px dotted var(--edge-soft);
+}
+.help-cards > div:last-child { border-bottom: none; }
+.help-cards span { color: var(--ink-dim); font-size: 0.95rem; }
+.help-pane .key-list { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); display: grid; gap: 4px 28px; }
+
+/* The custom cursor is set on <body>; nothing in the UI should replace it. */
+select, label, .switch, .tool-icon, .grace, .hand-count, .role-chip, .reach, #deck-count {
+  cursor: inherit;
+}
+input[type="text"], input:not([type]), textarea { cursor: text; }
+input[type="range"], input[type="checkbox"] { cursor: inherit; }

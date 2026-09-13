@@ -8,11 +8,14 @@ import { BoardView, BOARD_CENTER, cellToWorld, TILE } from './render/boardview.j
 import { BoardCamera } from './render/camera.js';
 import { HandView } from './render/handview.js';
 import { audio } from './audio/audio.js';
+import { cursorFor } from './render/cardart.js';
 import { HostSession, ClientSession } from './net/session.js';
 import { settings, saveSettings, qualityOf, openSettingsModal } from './ui/settings.js';
 import { Hud, openHelp } from './ui/hud.js';
 import { Menu } from './ui/menu.js';
-import { $, toast, banner, clearBanner, setScreen, openModal, closeModal, isModalOpen } from './ui/dom.js';
+import {
+  $, toast, banner, clearBanner, setScreen, openModal, closeModal, isModalOpen, initTooltips,
+} from './ui/dom.js';
 import { GOAL_CELLS, key as cellKey } from './game/board.js';
 import { cardTitle } from './game/cards.js';
 
@@ -86,6 +89,7 @@ async function boot() {
   });
 
   $('#btn-settings').addEventListener('click', () => openSettings());
+  initTooltips();
   bindInput();
   onResize();
   window.addEventListener('resize', onResize);
@@ -94,6 +98,7 @@ async function boot() {
   });
 
   setScreen('title');
+  applyCursor();
   requestAnimationFrame(loop);
 
   const loading = $('#loading');
@@ -249,7 +254,6 @@ function bindInput() {
     if (!app.view) return;
     const overHand = e.target.id === 'gl' ? app.hand.hitTest(e.clientX, e.clientY, canvasRect()) : null;
     app.hand.setHover(overHand);
-    document.body.style.cursor = overHand ? 'pointer' : '';
 
     if (!overHand && app.sel && (app.sel.mode === 'path' || app.sel.mode === 'tile' || app.sel.mode === 'gate')) {
       updateNdc(e);
@@ -360,6 +364,7 @@ function selectCard(cardId) {
   app.sel = { cardId, card, mode, rotated: false, tools: card.tools || [], blockedWhy };
   audio.play('select');
   app.hand.setSelected(cardId);
+  app.hand.setRotation(false);
   refreshSelectionVisuals();
 }
 
@@ -377,8 +382,18 @@ function clearSelection() {
 function rotateSelection() {
   if (!app.sel || app.sel.mode !== 'path') return;
   app.sel.rotated = !app.sel.rotated;
+  app.hand.setRotation(app.sel.rotated);
   audio.play('rotate');
   refreshSelectionVisuals();
+}
+
+/** Angel wings by default; a pitchfork once you know you are one of the Fallen. */
+function applyCursor() {
+  const role = app.view && app.view.you ? app.view.you.role : null;
+  const kind = role === 'fallen' ? 'fallen' : 'builder';
+  if (app.cursorKind === kind) return;
+  app.cursorKind = kind;
+  document.body.style.cursor = 'url(' + cursorFor(kind) + ') 3 2, auto';
 }
 
 function refreshSelectionVisuals() {
@@ -565,6 +580,7 @@ function onView(view) {
   else if (app.sel) refreshSelectionVisuals();
 
   app.hud.update(view);
+  applyCursor();
 
   // Round ceremonies.
   if (view.phase === 'playing' && view.round !== app.shownRoleForRound && view.you && view.you.role) {

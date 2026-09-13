@@ -134,3 +134,61 @@ export function escapeHtml(s) {
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
   ));
 }
+
+// --- tooltips --------------------------------------------------------------
+// A single themed bubble shared by every [data-tip] element, so the browser's
+// own slow, unstyled title popup is never needed.
+let tipNode = null;
+let tipTarget = null;
+
+function placeTip() {
+  if (!tipNode || !tipTarget) return;
+  const r = tipTarget.getBoundingClientRect();
+  const t = tipNode.getBoundingClientRect();
+  let left = r.left + r.width / 2 - t.width / 2;
+  left = Math.max(8, Math.min(window.innerWidth - t.width - 8, left));
+  let top = r.bottom + 9;
+  let below = true;
+  if (top + t.height > window.innerHeight - 8) {
+    top = r.top - t.height - 9;
+    below = false;
+  }
+  tipNode.style.left = Math.round(left) + 'px';
+  tipNode.style.top = Math.round(top) + 'px';
+  tipNode.classList.toggle('above', !below);
+  tipNode.style.setProperty('--tip-arrow', Math.round(r.left + r.width / 2 - left) + 'px');
+}
+
+export function showTip(target, text, title) {
+  if (!tipNode) tipNode = $('#tooltip');
+  if (!tipNode || !text) return;
+  tipTarget = target;
+  clear(tipNode);
+  if (title) tipNode.appendChild(el('strong', { text: title }));
+  tipNode.appendChild(el('span', { text }));
+  tipNode.classList.remove('hidden');
+  placeTip();
+}
+
+export function hideTip() {
+  if (!tipNode) return;
+  tipNode.classList.add('hidden');
+  tipTarget = null;
+}
+
+export function initTooltips() {
+  tipNode = $('#tooltip');
+  const over = (e) => {
+    const t = e.target.closest && e.target.closest('[data-tip]');
+    if (!t) {
+      if (tipTarget) hideTip();
+      return;
+    }
+    if (t === tipTarget) return;
+    showTip(t, t.dataset.tip, t.dataset.tipTitle);
+  };
+  document.addEventListener('pointermove', over);
+  document.addEventListener('pointerdown', () => hideTip());
+  window.addEventListener('scroll', () => hideTip(), true);
+  window.addEventListener('blur', () => hideTip());
+}

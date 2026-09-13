@@ -1,7 +1,7 @@
 // The in-game overlay: turn order, chronicle, chat, the action bar and every
 // end-of-round ceremony.
 
-import { $, el, clear, show, openModal, escapeHtml } from './dom.js';
+import { $, el, clear, show, openModal, escapeHtml, hideTip } from './dom.js';
 import { TOOLS, TOOL_INFO, cardTitle, cardDescription } from '../game/cards.js';
 import { toolGlyphDataUrl, makeRoleTexture } from '../render/cardart.js';
 import { GOAL_CELLS } from '../game/board.js';
@@ -60,6 +60,7 @@ export class Hud {
   }
 
   setSelection(sel) {
+    hideTip();
     this.sel = sel;
     this.renderActionBar();
     this.renderPlayers();
@@ -111,15 +112,24 @@ export class Hud {
     }
     $('#reach-badge').firstChild.textContent = String(reach);
 
-    $('#deck-count').textContent = 'Deck ' + v.deckCount;
+    const deck = $('#deck-count');
+    deck.textContent = 'Deck ' + v.deckCount;
+    deck.dataset.tipTitle = 'Cards left to draw';
+    deck.dataset.tip = 'When the deck and every hand run dry, the Fallen win the round.';
+
+    const reachBadge = $('#reach-badge');
+    reachBadge.dataset.tipTitle = 'How far the bridge reaches';
+    reachBadge.dataset.tip = 'The furthest column the bridge actually connects to from the '
+      + 'Cornerstone. The Gates stand at column 8.';
 
     const chip = $('#my-role');
     if (me && me.role) {
       chip.textContent = me.role === 'builder' ? 'Builder' : 'Fallen';
       chip.className = 'role-chip ' + me.role;
-      chip.title = me.role === 'builder'
-        ? 'Reach the Gate of Gold.'
-        : 'Make sure the bridge never arrives.';
+      chip.dataset.tipTitle = me.role === 'builder' ? 'You are a Builder' : 'You are Fallen';
+      chip.dataset.tip = me.role === 'builder'
+        ? 'Reach the Gate of Gold before the cards run out.'
+        : 'Make sure the bridge never arrives — and never let it show.';
     } else {
       chip.textContent = '—';
       chip.className = 'role-chip';
@@ -158,12 +168,13 @@ export class Hud {
       if (p.isBot && p.id === v.currentPlayerId) classes.push('thinking');
       if (targetable.has(p.id)) classes.push('targetable');
 
-      const tools = el('div', { class: 'tools' }, TOOLS.map((t) => el('img', {
+      const tools = el('div', { class: 'tools' }, TOOLS.map((t) => el('span', {
         class: 'tool-icon' + (p.broken[t] ? ' broken' : ''),
-        src: glyph(t, p.broken[t]),
-        alt: TOOL_INFO[t].name,
-        title: p.broken[t] ? TOOL_INFO[t].broken : TOOL_INFO[t].name,
-      })));
+        'data-tip-title': p.broken[t] ? TOOL_INFO[t].broken : TOOL_INFO[t].name + ' — intact',
+        'data-tip': p.broken[t]
+          ? p.name + ' cannot lay any span until this blessing is restored.'
+          : 'One of the three blessings. Lose any one and you cannot lay spans.',
+      }, [el('img', { src: glyph(t, p.broken[t]), alt: TOOL_INFO[t].name })])));
 
       const li = el('li', { class: classes.join(' ') }, [
         el('span', { class: 'dot', style: { background: p.color, color: p.color } }),
@@ -174,8 +185,19 @@ export class Hud {
         ]),
         el('span', { class: 'p-right' }, [
           tools,
-          el('span', { class: 'hand-count', text: '✦' + p.handCount }),
-          el('span', { class: 'grace', text: String(p.grace) }),
+          el('span', {
+            class: 'hand-count',
+            'data-tip-title': 'Cards in hand',
+            'data-tip': p.name + ' is holding ' + p.handCount + ' card'
+              + (p.handCount === 1 ? '' : 's') + '.',
+            text: '✦' + p.handCount,
+          }),
+          el('span', {
+            class: 'grace',
+            'data-tip-title': 'Grace',
+            'data-tip': 'Winnings so far, carried across every round. Most Grace wins.',
+            text: String(p.grace),
+          }),
         ]),
       ]);
 
@@ -210,7 +232,8 @@ export class Hud {
       wrap.appendChild(el('div', {
         class: 'peek-chip ' + (isGold ? 'gold' : 'stone'),
         text: where + ' · ' + (isGold ? 'GOLD' : 'stone'),
-        title: 'Only you have seen this.',
+        'data-tip-title': 'Your Revelation',
+        'data-tip': 'You looked beyond this Gate. Nobody else knows what you saw.',
       }));
     }
   }
@@ -420,65 +443,96 @@ export function chatLine(m) {
   ]);
 }
 
+const HELP_TABS = [
+  {
+    id: 'game',
+    label: 'The game',
+    html: `
+      <p class="lead">Two crews stand on a cloud. The <b>Builders</b> are laying a bridge east to
+      the Gate of Gold. The <b>Fallen</b> are mixed in among them, helping just enough to stay
+      above suspicion. Nobody knows who is who.</p>
+
+      <h4>Your turn — do one thing, then draw</h4>
+      <ul class="spaced">
+        <li><b>Lay a span.</b> Every touching edge must match, and it must join a span that already
+          reaches back to the Cornerstone.</li>
+        <li><b>Play an action</b> on a pilgrim, a span or a Gate.</li>
+        <li><b>Cast a card away</b> face down if you would rather do nothing.</li>
+      </ul>
+
+      <h4>How a round ends</h4>
+      <ul class="spaced">
+        <li>Reach the golden Gate and the <b>Builders win</b>. Whoever laid the final span takes the
+          richest share of Grace.</li>
+        <li>If every hand empties first, the <b>Fallen win</b> and share the spoils.</li>
+        <li>Three rounds. The most Grace at the end wins the crossing.</li>
+      </ul>
+
+      <p class="muted">Short of players? The host can summon Acolytes in the lobby. They are dealt
+      allegiances like anyone else — the helpful one beside you may well be Fallen.</p>`,
+  },
+  {
+    id: 'cards',
+    label: 'The cards',
+    html: `
+      <div class="help-cards">
+        <div><b>Bridge Span</b><span>Extends the bridge. Press <kbd>R</kbd> to turn it round before
+          you place it.</span></div>
+        <div><b>Broken Span</b><span>Attaches, but nothing crosses it. A quiet way to waste a
+          space.</span></div>
+        <div><b>Curse</b><span>Snuffed Halo, Shorn Wings or Shattered Hammer. That pilgrim may lay
+          no spans until it is restored.</span></div>
+        <div><b>Blessing</b><span>Restores one broken blessing on anyone, yourself included.</span></div>
+        <div><b>Benediction</b><span>Restores either of two blessings — you choose which.</span></div>
+        <div><b>Smite</b><span>Destroys one laid span. Never the Cornerstone, never a Gate.</span></div>
+        <div><b>Revelation</b><span>Look secretly beyond one Gate. Only you see what lies there.</span></div>
+      </div>
+      <p class="muted">A pilgrim with any blessing broken cannot lay spans at all — but can still
+      play actions, and can still cast a card away.</p>`,
+  },
+  {
+    id: 'controls',
+    label: 'Controls',
+    html: `
+      <div class="key-list">
+        <div><span>Pan the view</span><kbd>drag</kbd></div>
+        <div><span>Orbit</span><kbd>right-drag</kbd></div>
+        <div><span>Zoom</span><kbd>wheel</kbd></div>
+        <div><span>Pan</span><kbd>W A S D</kbd></div>
+        <div><span>Turn</span><kbd>Q E</kbd></div>
+        <div><span>Reset the view</span><kbd>R</kbd></div>
+        <div><span>Turn a held span round</span><kbd>R</kbd></div>
+        <div><span>Pick a card</span><kbd>1 – 6</kbd></div>
+        <div><span>Chat</span><kbd>Enter</kbd></div>
+        <div><span>Help</span><kbd>H</kbd></div>
+        <div><span>Cancel / settings</span><kbd>Esc</kbd></div>
+      </div>
+      <p class="muted">Cards in your hand are drawn the way the board looks from the Cornerstone:
+      east — towards the Gates — is up.</p>`,
+  },
+];
+
 export function openHelp() {
-  const body = el('div');
-  body.innerHTML = `
-    <p>Two crews stand on a cloud. The <strong>Builders</strong> want to lay a bridge east to the
-    Gate of Gold. The <strong>Fallen</strong> are mixed in among them, smiling, helping — and making
-    quite sure the bridge never arrives. Nobody knows who is who.</p>
+  const body = el('div', { class: 'help' });
+  const bar = el('div', { class: 'help-tabs' });
+  const pane = el('div', { class: 'help-pane' });
 
-    <p class="muted">Short of players? The host can summon <strong>Acolytes</strong> in the lobby.
-    They are dealt allegiances like anyone else, they only see what you see, and the friendly one
-    beside you may well be Fallen.</p>
+  HELP_TABS.forEach((tab, i) => {
+    const btn = el('button', {
+      class: 'help-tab' + (i === 0 ? ' active' : ''),
+      text: tab.label,
+      onclick: () => {
+        bar.querySelectorAll('.help-tab').forEach((b) => b.classList.toggle('active', b === btn));
+        pane.innerHTML = tab.html;
+      },
+    });
+    bar.appendChild(btn);
+  });
+  pane.innerHTML = HELP_TABS[0].html;
 
-    <div class="rules-cols">
-      <div>
-        <h3>A turn</h3>
-        <ul>
-          <li>Do exactly one thing, then draw a card.</li>
-          <li><b>Lay a span</b> next to the bridge. Every touching edge must match, and it must
-              join a span that already reaches back to the Cornerstone.</li>
-          <li><b>Play an action</b> on a pilgrim, a span or a Gate.</li>
-          <li><b>Cast a card away</b> face down if you would rather do nothing.</li>
-        </ul>
-      </div>
-      <div>
-        <h3>The cards</h3>
-        <ul>
-          <li><b>Bridge Span</b> — extends the bridge. Rotate it before you place it.</li>
-          <li><b>Broken Span</b> — attaches, but nothing crosses it. A quiet way to waste a space.</li>
-          <li><b>Curses</b> — a Snuffed Halo, Shorn Wings or a Shattered Hammer. That pilgrim may
-              lay no spans until it is restored.</li>
-          <li><b>Blessings</b> — restore one broken blessing on anyone, yourself included.</li>
-          <li><b>Smite</b> — destroy one laid span. Never the Cornerstone, never a Gate.</li>
-          <li><b>Revelation</b> — look secretly beyond one Gate.</li>
-        </ul>
-      </div>
-      <div>
-        <h3>Ending a round</h3>
-        <ul>
-          <li>Reach the golden Gate and the Builders win. The pilgrim who laid the final span takes
-              the richest share of Grace.</li>
-          <li>If every hand empties first, the Fallen win and share the spoils.</li>
-          <li>Three rounds. The most Grace at the end wins the crossing.</li>
-        </ul>
-      </div>
-      <div>
-        <h3>Moving about</h3>
-        <div class="key-list">
-          <div><span>Pan the view</span><kbd>drag</kbd></div>
-          <div><span>Orbit</span><kbd>right-drag</kbd></div>
-          <div><span>Zoom</span><kbd>wheel</kbd></div>
-          <div><span>Pan</span><kbd>W A S D</kbd></div>
-          <div><span>Turn</span><kbd>Q E</kbd></div>
-          <div><span>Reset the view</span><kbd>R</kbd></div>
-          <div><span>Rotate a held span</span><kbd>R</kbd></div>
-          <div><span>Pick a card</span><kbd>1 – 6</kbd></div>
-          <div><span>Cancel</span><kbd>Esc</kbd></div>
-        </div>
-      </div>
-    </div>`;
-  openModal({ title: 'How to Play', body, actions: [{ label: 'Close', primary: true }] });
+  body.appendChild(bar);
+  body.appendChild(pane);
+  openModal({ title: 'How to Play', body, wide: true, actions: [{ label: 'Close', primary: true }] });
 }
 
 export { cardDescription };

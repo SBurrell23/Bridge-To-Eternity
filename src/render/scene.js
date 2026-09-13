@@ -45,7 +45,13 @@ export class World {
   buildSky() {
     const geo = new THREE.SphereGeometry(600, 32, 24);
     const tex = canvasTexture(makeSkyTexture());
-    const mat = new THREE.MeshBasicMaterial({ map: tex, side: THREE.BackSide, fog: false, depthWrite: false });
+    // toneMapped:false is what makes the horizon seamless. three.js applies fog
+    // AFTER tone mapping, so a fogged surface ends up as the raw fog colour
+    // while a tone-mapped sky does not -- and the two met in a visible line.
+    // Opting the sky out of tone mapping puts both on the same footing.
+    const mat = new THREE.MeshBasicMaterial({
+      map: tex, side: THREE.BackSide, fog: false, depthWrite: false, toneMapped: false,
+    });
     this.sky = new THREE.Mesh(geo, mat);
     this.sky.rotation.y = Math.PI;
     this.scene.add(this.sky);
@@ -139,7 +145,8 @@ export class World {
       s.position.set(9 + Math.cos(a) * ring, -20 + Math.random() * 34, Math.sin(a) * ring);
       const sc = 18 + Math.random() * 52;
       s.scale.set(sc, sc * 0.62, 1);
-      s.material.opacity = 0.28 + Math.random() * 0.5;
+      s.userData.baseOpacity = 0.28 + Math.random() * 0.5;
+      s.material.opacity = s.userData.baseOpacity;
       s.userData.drift = 0.4 + Math.random() * 1.1;
       s.userData.bob = Math.random() * Math.PI * 2;
       this.puffs.push(s);
@@ -210,18 +217,10 @@ export class World {
   }
 
   buildDistantGates() {
-    // Vast silhouettes far to the east: the destination, never reachable.
+    // Just light on the eastern horizon. Actual geometry out here read as flat
+    // translucent boxes with hard edges as soon as the camera orbited towards
+    // it, which is precisely the kind of seam the fog is meant to hide.
     const group = new THREE.Group();
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0xffffff, transparent: true, opacity: 0.18, fog: true, depthWrite: false,
-    });
-    for (let i = 0; i < 5; i++) {
-      const h = 60 + Math.random() * 90;
-      const w = 10 + Math.random() * 18;
-      const pillar = new THREE.Mesh(new THREE.BoxGeometry(w, h, w), mat);
-      pillar.position.set(190 + Math.random() * 90, h / 2 - 26, -110 + i * 58 + Math.random() * 20);
-      group.add(pillar);
-    }
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({
       map: canvasTexture(makeGlowTexture(256, '255,236,180')),
       blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false,
@@ -263,6 +262,13 @@ export class World {
       p.position.x += p.userData.drift * dt * 0.55;
       p.position.y += Math.sin(t * 0.22 + p.userData.bob) * dt * 0.28;
       if (p.position.x > 270) p.position.x = -250;
+      // A puff the camera has drifted into fills the screen with one flat quad.
+      // Fade it out before it gets close enough for its edges to read.
+      if (camera) {
+        const d = p.position.distanceTo(camera.position);
+        const near = Math.min(1, Math.max(0, (d - 22) / 46));
+        p.material.opacity = p.userData.baseOpacity * near * near;
+      }
     }
 
     if (this.rays) {

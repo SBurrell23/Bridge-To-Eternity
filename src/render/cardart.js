@@ -1,7 +1,9 @@
 // Every texture in the game is drawn here, at runtime, onto a 2D canvas.
 // No image files are shipped: spans, gates, halos, wings and hammers are all code.
 
-import { cardTitle, cardDescription, TOOL_INFO } from '../game/cards.js';
+import {
+  cardTitle, cardDescription, TOOL_INFO, edgeSetToObj, rotateEdges,
+} from '../game/cards.js';
 
 export const PALETTE = {
   gold:      '#f3d489',
@@ -410,6 +412,10 @@ export function makeGateTexture(kind, size = 512) {
 function drawQuestion(ctx, S) {
   ctx.save();
   ctx.translate(S / 2, S / 2);
+  // A tile's canvas maps +x to world east, and a player stands at the
+  // Cornerstone looking east -- so east is "up" on their screen. A quarter
+  // turn puts the glyph's head that way instead of leaving it sideways.
+  ctx.rotate(Math.PI / 2);
   ctx.globalAlpha = 0.9;
   ctx.fillStyle = '#f3d489';
   ctx.font = '700 ' + Math.round(S * 0.42) + 'px Cinzel, Georgia, serif';
@@ -477,6 +483,38 @@ export function drawHalo(ctx, cx, cy, R, broken) {
   ctx.restore();
 }
 
+/** One wing from a shoulder at the origin, fanning to the right. */
+function featherFan(ctx, R, stroke, rows) {
+  const feather = (a, L, w) => {
+    const tx = Math.cos(a) * L;
+    const ty = Math.sin(a) * L;
+    const nx = -Math.sin(a) * w;
+    const ny = Math.cos(a) * w;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.quadraticCurveTo(tx * 0.45 + nx, ty * 0.45 + ny, tx, ty);
+    ctx.quadraticCurveTo(tx * 0.45 - nx, ty * 0.45 - ny, 0, 0);
+    ctx.closePath();
+    ctx.fill();
+    if (stroke) ctx.stroke();
+  };
+  for (const row of rows) {
+    ctx.fillStyle = row.fill;
+    for (let i = 0; i < row.n; i++) {
+      const t = row.n === 1 ? 0 : i / (row.n - 1);
+      const a = row.a0 + (row.a1 - row.a0) * t;
+      const L = R * (row.l0 + (row.l1 - row.l0) * t);
+      feather(a, L, R * row.w);
+    }
+  }
+}
+
+const WING_ROWS = [
+  { n: 7, a0: -0.62, a1: 0.42, l0: 1.62, l1: 1.02, w: 0.115, fill: '#efe0c2' },
+  { n: 6, a0: -0.55, a1: 0.38, l0: 1.18, l1: 0.74, w: 0.105, fill: '#fdf2e0' },
+  { n: 5, a0: -0.46, a1: 0.30, l0: 0.76, l1: 0.48, w: 0.095, fill: '#fffdf6' },
+];
+
 export function drawWings(ctx, cx, cy, R, broken) {
   const feather = (dir) => {
     ctx.save();
@@ -540,17 +578,103 @@ export function drawWings(ctx, cx, cy, R, broken) {
   } else {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 1.8);
-    g.addColorStop(0, 'rgba(255,246,214,0.4)');
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 1.9);
+    g.addColorStop(0, 'rgba(255,246,214,0.45)');
     g.addColorStop(1, 'rgba(255,220,140,0)');
     ctx.fillStyle = g;
-    ctx.fillRect(-R * 2, -R * 2, R * 4, R * 4);
+    ctx.fillRect(-R * 2.2, -R * 2.2, R * 4.4, R * 4.4);
     ctx.restore();
-    ctx.fillStyle = '#fffaf0';
-    ctx.strokeStyle = PALETTE.goldDeep;
-    feather(1);
-    feather(-1);
+
+    ctx.strokeStyle = 'rgba(201,153,47,0.55)';
+    ctx.lineWidth = R * 0.035;
+    [1, -1].forEach((dir) => {
+      ctx.save();
+      ctx.scale(dir, 1);
+      ctx.translate(R * 0.08, -R * 0.1);
+      featherFan(ctx, R, true, WING_ROWS);
+      ctx.restore();
+    });
   }
+  ctx.restore();
+}
+
+/** The Builder emblem: a halo over open wings, the hammer standing between. */
+export function drawBuilderEmblem(ctx, cx, cy, R) {
+  ctx.save();
+  ctx.translate(cx, cy);
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const bloom = ctx.createRadialGradient(0, -R * 0.15, 0, 0, -R * 0.15, R * 2.3);
+  bloom.addColorStop(0, 'rgba(255,246,212,0.6)');
+  bloom.addColorStop(0.4, 'rgba(255,216,130,0.28)');
+  bloom.addColorStop(1, 'rgba(255,190,70,0)');
+  ctx.fillStyle = bloom;
+  ctx.fillRect(-R * 2.6, -R * 2.6, R * 5.2, R * 5.2);
+  ctx.strokeStyle = 'rgba(255,238,180,0.38)';
+  ctx.lineWidth = R * 0.05;
+  for (let i = 0; i < 20; i++) {
+    const a = (i / 20) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a) * R * 1.05, -R * 0.15 + Math.sin(a) * R * 1.05);
+    ctx.lineTo(Math.cos(a) * R * (1.4 + (i % 2) * 0.3), -R * 0.15 + Math.sin(a) * R * (1.4 + (i % 2) * 0.3));
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(0, R * 0.36);
+  ctx.strokeStyle = 'rgba(201,153,47,0.5)';
+  ctx.lineWidth = R * 0.03;
+  const rows = [
+    { n: 8, a0: -0.66, a1: 0.34, l0: 1.74, l1: 1.06, w: 0.1,   fill: '#e9d6b4' },
+    { n: 7, a0: -0.58, a1: 0.30, l0: 1.26, l1: 0.78, w: 0.092, fill: '#fbefdc' },
+    { n: 5, a0: -0.48, a1: 0.24, l0: 0.82, l1: 0.50, w: 0.085, fill: '#fffdf7' },
+  ];
+  [1, -1].forEach((dir) => {
+    ctx.save();
+    ctx.scale(dir, 1);
+    ctx.translate(R * 0.14, 0);
+    featherFan(ctx, R, true, rows);
+    ctx.restore();
+  });
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(0, R * 0.14);
+  ctx.fillStyle = '#6a4b2c';
+  ctx.strokeStyle = '#3a2716';
+  ctx.lineWidth = R * 0.045;
+  roundRect(ctx, -R * 0.085, -R * 0.08, R * 0.17, R * 1.12, R * 0.06);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = goldGradient(ctx, -R * 0.5, -R * 0.5, R * 0.5, R * 0.05);
+  ctx.strokeStyle = PALETTE.goldDark;
+  ctx.lineWidth = R * 0.05;
+  roundRect(ctx, -R * 0.46, -R * 0.48, R * 0.92, R * 0.44, R * 0.08);
+  ctx.fill();
+  ctx.stroke();
+  ctx.globalAlpha = 0.7;
+  ctx.fillStyle = '#fffbe8';
+  roundRect(ctx, -R * 0.4, -R * 0.44, R * 0.8, R * 0.08, R * 0.04);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(0, -R * 1.02);
+  ctx.strokeStyle = goldGradient(ctx, -R * 0.6, -R * 0.2, R * 0.6, R * 0.2);
+  ctx.lineWidth = R * 0.13;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, R * 0.62, R * 0.2, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.globalAlpha = 0.75;
+  ctx.strokeStyle = '#fffdf0';
+  ctx.lineWidth = R * 0.045;
+  ctx.beginPath();
+  ctx.ellipse(0, -R * 0.03, R * 0.56, R * 0.16, 0, Math.PI * 1.05, Math.PI * 1.95);
+  ctx.stroke();
+  ctx.restore();
+
   ctx.restore();
 }
 
@@ -1063,7 +1187,10 @@ function cardFooter(ctx, W, H, text, ink) {
   ctx.restore();
 }
 
-export function makeCardFaceTexture(card) {
+/**
+ * @param rotated  draw the span as it will sit once flipped end-for-end.
+ */
+export function makeCardFaceTexture(card, rotated = false) {
   const c = createCanvas(CARD_W, CARD_H);
   const ctx = c.getContext('2d');
   const W = CARD_W;
@@ -1085,12 +1212,11 @@ export function makeCardFaceTexture(card) {
     // Show the actual span, drawn top-down and inset in the frame.
     const S = Math.round(W * 0.56);
     const tile = createCanvas(S, S);
-    const edges = {
-      n: card.edges.includes('N'),
-      e: card.edges.includes('E'),
-      s: card.edges.includes('S'),
-      w: card.edges.includes('W'),
-    };
+    // The player looks east from the Cornerstone, so on screen east is up and
+    // south is right. Drawing in board axes made an east-west span read as a
+    // left-right corridor when it actually lay up-down the screen.
+    const board = rotated ? rotateEdges(edgeSetToObj(card.edges)) : edgeSetToObj(card.edges);
+    const edges = { n: board.e, e: board.s, s: board.w, w: board.n };
     drawSpanArt(tile.getContext('2d'), S, edges, card.passable);
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.45)';
@@ -1258,8 +1384,7 @@ export function makeRoleTexture(role) {
   const cy = panelY + panelH / 2;
 
   if (builder) {
-    drawWings(ctx, cx, cy - W * 0.06, W * 0.16, false);
-    drawHammer(ctx, cx, cy + W * 0.2, W * 0.14, false);
+    drawBuilderEmblem(ctx, cx, cy + W * 0.02, W * 0.175);
   } else {
     drawHornsAndFire(ctx, cx, cy + W * 0.05, W * 0.185);
   }
@@ -1341,6 +1466,16 @@ export function makePuffTexture(size = 256) {
   g.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
+
+  // Guarantee the quad reaches zero alpha well inside its own edge, so a puff
+  // drifting close to the camera can never show a straight border.
+  ctx.globalCompositeOperation = 'destination-out';
+  const cut = ctx.createRadialGradient(size / 2, size / 2, size * 0.36, size / 2, size / 2, size * 0.5);
+  cut.addColorStop(0, 'rgba(0,0,0,0)');
+  cut.addColorStop(1, 'rgba(0,0,0,1)');
+  ctx.fillStyle = cut;
+  ctx.fillRect(0, 0, size, size);
+  ctx.globalCompositeOperation = 'source-over';
   return c;
 }
 
@@ -1360,8 +1495,11 @@ export function makeRayTexture(size = 256) {
   const c = createCanvas(size, size);
   const ctx = c.getContext('2d');
   const g = ctx.createLinearGradient(0, 0, 0, size);
-  g.addColorStop(0, 'rgba(255,240,200,0.55)');
-  g.addColorStop(0.6, 'rgba(255,225,160,0.16)');
+  // Fades in at the top as well as out at the bottom: a hard top edge turned
+  // every shaft into a visible horizontal line across the sky.
+  g.addColorStop(0, 'rgba(255,240,200,0)');
+  g.addColorStop(0.14, 'rgba(255,240,200,0.5)');
+  g.addColorStop(0.58, 'rgba(255,228,166,0.16)');
   g.addColorStop(1, 'rgba(255,210,130,0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
@@ -1406,3 +1544,99 @@ export function toolGlyphDataUrl(tool, broken, size = 96) {
 }
 
 export const TOOL_NAMES = TOOL_INFO;
+
+// ---------------------------------------------------------------------------
+// Cursors. A pointer you can actually aim with, wearing the mark of your side.
+// ---------------------------------------------------------------------------
+export function makeCursor(kind, size = 40) {
+  const c = createCanvas(size, size);
+  const ctx = c.getContext('2d');
+  const S = size / 40;
+  const fallen = kind === 'fallen';
+
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.55)';
+  ctx.shadowBlur = 3 * S;
+  ctx.shadowOffsetY = 1 * S;
+
+  if (fallen) {
+    // Three barbed prongs sweeping back from the point.
+    ctx.strokeStyle = '#3a0a10';
+    ctx.lineWidth = 4.4 * S;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const prongs = [[16, 26], [23, 20], [22, 29]];
+    for (let pass = 0; pass < 2; pass++) {
+      ctx.strokeStyle = pass === 0 ? '#3a0a10' : '#e0402f';
+      ctx.lineWidth = (pass === 0 ? 5.2 : 2.6) * S;
+      for (const [px, py] of prongs) {
+        ctx.beginPath();
+        ctx.moveTo(3 * S, 3 * S);
+        ctx.lineTo(px * S, py * S);
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.moveTo(3 * S, 3 * S);
+      ctx.lineTo(30 * S, 34 * S);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#ffd0a0';
+    ctx.beginPath();
+    ctx.arc(3.2 * S, 3.2 * S, 2.1 * S, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // An arrow with a pair of wings folded either side of it.
+    const wing = (dir) => {
+      ctx.save();
+      ctx.translate(12 * S, 14 * S);
+      ctx.scale(dir, 1);
+      ctx.rotate(-1.05);
+      ctx.fillStyle = 'rgba(255,252,240,0.96)';
+      ctx.strokeStyle = 'rgba(150,112,32,0.75)';
+      ctx.lineWidth = 1.1 * S;
+      for (let i = 0; i < 4; i++) {
+        const t = i / 3;
+        const a = -0.62 + t * 1.05;
+        const L = (17 - t * 6) * S;
+        const w = 2.7 * S;
+        const tx = Math.cos(a) * L;
+        const ty = Math.sin(a) * L;
+        const nx = -Math.sin(a) * w;
+        const ny = Math.cos(a) * w;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(tx * 0.45 + nx, ty * 0.45 + ny, tx, ty);
+        ctx.quadraticCurveTo(tx * 0.45 - nx, ty * 0.45 - ny, 0, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+    };
+    wing(1);
+    wing(-1);
+
+    ctx.beginPath();
+    ctx.moveTo(3 * S, 2 * S);
+    ctx.lineTo(3 * S, 27 * S);
+    ctx.lineTo(10 * S, 21 * S);
+    ctx.lineTo(15 * S, 32 * S);
+    ctx.lineTo(20 * S, 29 * S);
+    ctx.lineTo(15 * S, 19 * S);
+    ctx.lineTo(23 * S, 18 * S);
+    ctx.closePath();
+    ctx.fillStyle = goldGradient(ctx, 3 * S, 2 * S, 23 * S, 32 * S);
+    ctx.fill();
+    ctx.strokeStyle = '#4a3410';
+    ctx.lineWidth = 1.6 * S;
+    ctx.stroke();
+  }
+  ctx.restore();
+  return c.toDataURL();
+}
+
+const cursorCache = {};
+export function cursorFor(kind) {
+  if (!cursorCache[kind]) cursorCache[kind] = makeCursor(kind);
+  return cursorCache[kind];
+}
