@@ -10,6 +10,17 @@ export const GOAL_CELLS = [
   { x: 8, y: 2 },
 ];
 
+/**
+ * What a Gate is called on screen. The board is seen from the Cornerstone
+ * looking east, so east is up and the board's north edge is the player's left.
+ */
+export function gateName(index, withSuffix = true) {
+  const c = GOAL_CELLS[index];
+  if (!c) return withSuffix ? 'Gate' : '';
+  const side = c.y < 0 ? 'Left' : c.y > 0 ? 'Right' : 'Middle';
+  return withSuffix ? side + ' Gate' : side;
+}
+
 export const DIRS = [
   { d: 'n', dx: 0, dy: -1, opp: 's' },
   { d: 'e', dx: 1, dy: 0,  opp: 'w' },

@@ -16,7 +16,7 @@ import { Menu } from './ui/menu.js';
 import {
   $, toast, banner, clearBanner, setScreen, openModal, closeModal, isModalOpen, initTooltips,
 } from './ui/dom.js';
-import { GOAL_CELLS, key as cellKey } from './game/board.js';
+import { GOAL_CELLS, gateName, key as cellKey } from './game/board.js';
 import { cardTitle } from './game/cards.js';
 
 const app = {
@@ -520,8 +520,7 @@ function attachSession(session) {
   session.on('sfx', (name) => audio.play(name));
   session.on('private', (msg) => {
     if (msg.t === 'peek') {
-      const cell = GOAL_CELLS[msg.goalIndex];
-      const where = cell.y < 0 ? 'North Gate' : cell.y > 0 ? 'South Gate' : 'Middle Gate';
+      const where = gateName(msg.goalIndex);
       banner(msg.isGold ? 'Heaven lies beyond' : 'Only stone', !msg.isGold, 2400);
       toast('The ' + where + ' hides ' + (msg.isGold ? 'the Gate to Heaven.' : 'nothing but stone.'),
         msg.isGold ? 'good' : '', 5000);

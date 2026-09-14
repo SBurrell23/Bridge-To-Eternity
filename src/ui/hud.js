@@ -4,7 +4,7 @@
 import { $, el, clear, show, openModal, escapeHtml, hideTip } from './dom.js';
 import { TOOLS, TOOL_INFO, cardTitle, cardDescription } from '../game/cards.js';
 import { toolGlyphDataUrl, makeRoleTexture } from '../render/cardart.js';
-import { GOAL_CELLS } from '../game/board.js';
+import { gateName } from '../game/board.js';
 
 const glyphCache = {};
 function glyph(tool, broken) {
@@ -227,8 +227,7 @@ export class Hud {
     const v = this.view;
     if (!v || !v.you || !v.you.peeks) return;
     for (const [gi, isGold] of Object.entries(v.you.peeks)) {
-      const cell = GOAL_CELLS[gi];
-      const where = cell.y < 0 ? 'North Gate' : cell.y > 0 ? 'South Gate' : 'Middle Gate';
+      const where = gateName(gi);
       wrap.appendChild(el('div', {
         class: 'peek-chip ' + (isGold ? 'gold' : 'stone'),
         text: where + ' · ' + (isGold ? 'HEAVEN' : 'stone'),
@@ -355,8 +354,7 @@ export class Hud {
 
     body.appendChild(el('h3', { text: 'The Gates' }));
     body.appendChild(el('div', { class: 'gate-row' }, r.goals.map((g) => {
-      const cell = GOAL_CELLS[g.index];
-      const where = cell.y < 0 ? 'North' : cell.y > 0 ? 'South' : 'Middle';
+      const where = gateName(g.index, false);
       return el('div', { class: 'gate-card ' + (g.isGold ? 'gold' : 'stone') }, [
         el('div', { class: 'gate-art', text: g.isGold ? '★' : '▪' }),
         where,
