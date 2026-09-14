@@ -227,7 +227,7 @@ export class Engine {
         s.players[id].roundGrace = v;
         awards.push({ id, value: v });
       });
-      this.log('The Gate of Gold is opened. The Builders cross over.', 'win');
+      this.log('The Gate to Heaven is opened. The Builders cross over.', 'win');
     } else {
       const payout = FALLEN_PAYOUT[Math.min(4, Math.max(1, fallen.length))] || 0;
       fallen.forEach((id) => {
@@ -372,7 +372,7 @@ export class Engine {
       const cell = GOAL_CELLS[gi];
       const t = s.tiles[key(cell.x, cell.y)];
       if (t.isGold) {
-        this.log('A Gate of purest gold stands open.', 'win');
+        this.log('The Gate to Heaven stands open.', 'win');
         this.endRound('builders', p.id);
         return { ok: true };
       }

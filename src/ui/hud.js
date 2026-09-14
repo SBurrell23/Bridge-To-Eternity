@@ -128,7 +128,7 @@ export class Hud {
       chip.className = 'role-chip ' + me.role;
       chip.dataset.tipTitle = me.role === 'builder' ? 'You are a Builder' : 'You are Fallen';
       chip.dataset.tip = me.role === 'builder'
-        ? 'Reach the Gate of Gold before the cards run out.'
+        ? 'Reach the Gate to Heaven before the cards run out.'
         : 'Make sure the bridge never arrives — and never let it show.';
     } else {
       chip.textContent = '—';
@@ -231,7 +231,7 @@ export class Hud {
       const where = cell.y < 0 ? 'North Gate' : cell.y > 0 ? 'South Gate' : 'Middle Gate';
       wrap.appendChild(el('div', {
         class: 'peek-chip ' + (isGold ? 'gold' : 'stone'),
-        text: where + ' · ' + (isGold ? 'GOLD' : 'stone'),
+        text: where + ' · ' + (isGold ? 'HEAVEN' : 'stone'),
         'data-tip-title': 'Your Revelation',
         'data-tip': 'You looked beyond this Gate. Nobody else knows what you saw.',
       }));
@@ -330,7 +330,7 @@ export class Hud {
       el('div', { class: 'role-name ' + role, text: role === 'builder' ? 'You are a Builder' : 'You are Fallen' }),
       el('p', {
         text: role === 'builder'
-          ? 'Work with the others. Reach the Gate of Gold before the cards run out — but watch who lays a broken span.'
+          ? 'Work with the others. Reach the Gate to Heaven before the cards run out — but watch who lays a broken span.'
           : 'Smile. Help a little. Then make certain the bridge never arrives. Say nothing of this.',
       }),
     ]);
@@ -349,7 +349,7 @@ export class Hud {
 
     body.appendChild(el('p', {
       text: builders
-        ? 'The last span settles into place and the Gate of Gold swings open. Light pours across the bridge.'
+        ? 'The last span settles into place and the Gate to Heaven swings open. Light pours across the bridge.'
         : 'The cards run out. The span ends in empty air, and somewhere below, something laughs.',
     }));
 
@@ -449,7 +449,7 @@ const HELP_TABS = [
     label: 'The game',
     html: `
       <p class="lead">Two crews stand on a cloud. The <b>Builders</b> are laying a bridge east to
-      the Gate of Gold. The <b>Fallen</b> are mixed in among them, helping just enough to stay
+      the Gate to Heaven. The <b>Fallen</b> are mixed in among them, helping just enough to stay
       above suspicion. Nobody knows who is who.</p>
 
       <h4>Your turn — do one thing, then draw</h4>
@@ -462,7 +462,7 @@ const HELP_TABS = [
 
       <h4>How a round ends</h4>
       <ul class="spaced">
-        <li>Reach the golden Gate and the <b>Builders win</b>. Whoever laid the final span takes the
+        <li>Reach the Gate to Heaven and the <b>Builders win</b>. Whoever laid the final span takes the
           richest share of Grace.</li>
         <li>If every hand empties first, the <b>Fallen win</b> and share the spoils.</li>
         <li>Three rounds. The most Grace at the end wins the crossing.</li>
@@ -485,7 +485,8 @@ const HELP_TABS = [
         <div><b>Blessing</b><span>Restores one broken blessing on anyone, yourself included.</span></div>
         <div><b>Benediction</b><span>Restores either of two blessings — you choose which.</span></div>
         <div><b>Smite</b><span>Destroys one laid span. Never the Cornerstone, never a Gate.</span></div>
-        <div><b>Revelation</b><span>Look secretly beyond one Gate. Only you see what lies there.</span></div>
+        <div><b>Revelation</b><span>Look secretly beyond one Gate — one of the three is the Gate
+          to Heaven. Only you see what lies there.</span></div>
       </div>
       <p class="muted">A pilgrim with any blessing broken cannot lay spans at all — but can still
       play actions, and can still cast a card away.</p>`,

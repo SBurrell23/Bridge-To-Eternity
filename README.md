@@ -2,7 +2,7 @@
 
 A 3D, peer-to-peer, browser card game in the clouds.
 
-Two crews stand on a cloudbank. The **Builders** want to lay a bridge east to the Gate of Gold.
+Two crews stand on a cloudbank. The **Builders** want to lay a bridge east to the Gate to Heaven.
 The **Fallen** are mixed in among them, smiling, helping — and making quite sure the bridge never
 arrives. Nobody knows who is who.
 
@@ -72,7 +72,7 @@ Do exactly one thing, then draw a card:
 | --- | --- | --- |
 | Bridge Span | 31 | Extends the bridge. |
 | Broken Span | 9 | Attaches, but nothing crosses it. A quiet way to waste a space. |
-| Cornerstone / Gates | 1 + 3 | The start tile and three face-down Gates; one hides gold. |
+| Cornerstone / Gates | 1 + 3 | The start tile and three face-down Gates; one is the Gate to Heaven. |
 | Snuffed Halo / Shorn Wings / Shattered Hammer | 9 | Curse a pilgrim — they may lay no spans until restored. |
 | Rekindled Halo / Mended Wings / Reforged Hammer | 6 | Restore one broken blessing on anyone. |
 | Benediction | 3 | Restore either of two blessings. |
@@ -81,7 +81,7 @@ Do exactly one thing, then draw a card:
 
 ### Ending a round
 
-Reach the golden Gate and the Builders win; the pilgrim who laid the final span takes the richest
+Reach the Gate to Heaven and the Builders win; the pilgrim who laid the final span takes the richest
 share of Grace. If every hand empties first, the Fallen win and share the spoils (4 / 3 / 2 / 1 each,
 by how many of them there are). Three rounds by default — the most Grace at the end wins the crossing.
 

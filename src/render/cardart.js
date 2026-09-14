@@ -1530,8 +1530,10 @@ export function makeRoleTexture(role) {
 
   cardFrame(ctx, W, H, accent, !builder);
   cardBanner(ctx, W, builder ? 'Builder' : 'Fallen', W * 0.1, accent.ink);
-  const panelY = W * 0.29;
-  const panelH = W * 0.86;
+  // Match the play cards: the panel was left at the old taller size here, and
+  // the footer text climbed over the bottom of the art.
+  const panelY = W * 0.285;
+  const panelH = W * 0.76;
   artPanel(ctx, W, panelY, panelH, !builder);
   const cx = W / 2;
   const cy = panelY + panelH / 2;
@@ -1543,7 +1545,7 @@ export function makeRoleTexture(role) {
   }
 
   cardFooter(ctx, W, H, builder
-    ? 'Raise the span. Reach the Gate of Gold before the sky runs out.'
+    ? 'Raise the span. Reach the Gate to Heaven before the sky runs out.'
     : 'Let them build. Then let it fall. Reveal nothing.', accent.ink);
   grain(ctx, W, H, 9);
   return c;

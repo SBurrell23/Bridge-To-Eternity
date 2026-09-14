@@ -522,8 +522,8 @@ function attachSession(session) {
     if (msg.t === 'peek') {
       const cell = GOAL_CELLS[msg.goalIndex];
       const where = cell.y < 0 ? 'North Gate' : cell.y > 0 ? 'South Gate' : 'Middle Gate';
-      banner(msg.isGold ? 'GOLD lies beyond' : 'Only stone', !msg.isGold, 2400);
-      toast('The ' + where + ' hides ' + (msg.isGold ? 'the Gate of Gold.' : 'nothing but stone.'),
+      banner(msg.isGold ? 'Heaven lies beyond' : 'Only stone', !msg.isGold, 2400);
+      toast('The ' + where + ' hides ' + (msg.isGold ? 'the Gate to Heaven.' : 'nothing but stone.'),
         msg.isGold ? 'good' : '', 5000);
     }
   });
